@@ -26,7 +26,7 @@ import {
 } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
-// 🔴 PASSO IMPORTANTE: Substitua este objeto pelas chaves que você pegou no Console do Firebase
+// 🔴 🔴 🔴 SUBSTITUA COM SUAS CHAVES AQUI 🔴 🔴 🔴
 const manualConfig = {
   apiKey: "AIzaSyC47npvRo_nBky0R6J-27eMc4h4KZLAjqw",
   authDomain: "assados-familia-davanzo.firebaseapp.com",
@@ -37,13 +37,13 @@ const manualConfig = {
   measurementId: "G-Q240S9258G"
 };
 
-// Inicialização segura (usa variáveis de ambiente se disponíveis, ou a config manual)
+// Inicialização segura
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ID do App para separar dados (útil se usar ambiente compartilhado, pode manter fixo para prod)
+// ID do App para separar dados
 const APP_ID = 'assados-davanzo-prod'; 
 
 // --- FUNÇÕES AUXILIARES ---
@@ -61,13 +61,17 @@ const LoginScreen = ({ role, onLogin, onBack }) => {
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
 
+  // Limpa sessão anterior ao abrir a tela de login para garantir login limpo
+  useEffect(() => {
+    signOut(auth).catch(() => {});
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-      // O listener onAuthStateChanged vai lidar com o resto, mas chamamos onLogin para atualizar a UI local
-      onLogin();
+      onLogin(); // Confirma o login localmente
     } catch (err) {
       console.error(err);
       setError('Erro ao entrar. Verifique e-mail e senha.');
@@ -127,7 +131,7 @@ export default function FoodBusinessApp() {
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // Estado de Login
+  // Estado de Login e Modos
   const [user, setUser] = useState(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isDriverMode, setIsDriverMode] = useState(false);
@@ -145,25 +149,20 @@ export default function FoodBusinessApp() {
 
   // 1. EFEITO DE INICIALIZAÇÃO E AUTH
   useEffect(() => {
-    // Escuta mudanças no Auth
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
-        // Se não tem usuário, faz login anônimo (padrão para clientes)
-        // Só fazemos isso se não estivermos na tela de login de admin/driver intencionalmente
-        // Mas para simplificar, o cliente sempre será anônimo a menos que logue explicitamente
-        signInAnonymously(auth).catch(console.error);
+        // Se estiver na tela de cliente ou landing, loga anonimamente para permitir leitura do cardápio
+        if (view === 'customer' || view === 'landing') {
+             signInAnonymously(auth).catch(() => {});
+        }
       }
     });
-
     return () => unsubscribeAuth();
-  }, []);
+  }, [view]);
 
-  // 2. EFEITO PARA CARREGAR DADOS DO FIRESTORE (TEMPO REAL)
+  // 2. EFEITO PARA CARREGAR DADOS DO FIRESTORE
   useEffect(() => {
-    // Usamos o padrão de path "artifacts/{appId}/public/data/..." para compatibilidade
-    // Em um app próprio na Vercel, você poderia usar apenas collection(db, 'products')
-    
     // Produtos
     const productsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'products');
     const unsubProducts = onSnapshot(productsRef, (snapshot) => {
@@ -175,7 +174,6 @@ export default function FoodBusinessApp() {
     const ordersRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders');
     const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
       let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Ordenação em memória (Firestore precisa de index para orderBy complexo)
       items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(items);
     }, (error) => console.error("Erro ao carregar pedidos:", error));
@@ -213,7 +211,6 @@ export default function FoodBusinessApp() {
     }
 
     try {
-      // 1. Salvar no Firestore
       const orderData = {
         customer: checkoutForm.name,
         whatsapp: checkoutForm.whatsapp,
@@ -228,7 +225,6 @@ export default function FoodBusinessApp() {
 
       const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), orderData);
 
-      // 2. Enviar WhatsApp
       let message = `*NOVO PEDIDO #${docRef.id.slice(0, 4).toUpperCase()} - FAMILIA DAVANZO*\n\n`;
       message += `*Cliente:* ${checkoutForm.name}\n`;
       message += `*Endereço:* ${checkoutForm.address}\n`;
@@ -243,7 +239,6 @@ export default function FoodBusinessApp() {
       const whatsappUrl = `https://wa.me/5511999999999?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
 
-      // 3. Limpar
       setCart([]);
       setIsCartOpen(false);
       setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '' });
@@ -267,11 +262,9 @@ export default function FoodBusinessApp() {
 
     try {
       if (editingProduct.id) {
-        // Update
         const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', editingProduct.id);
         await updateDoc(ref, productData);
       } else {
-        // Create
         await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'products'), productData);
       }
       setIsProductFormOpen(false);
@@ -292,7 +285,6 @@ export default function FoodBusinessApp() {
     }
   };
 
-  // --- AÇÕES DE PEDIDO (ADMIN/DRIVER) ---
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId);
@@ -302,7 +294,7 @@ export default function FoodBusinessApp() {
     }
   };
 
-  // --- HELPERS DE UI ---
+  // --- HELPERS E ESTATÍSTICAS ---
   const getStatusColor = (status) => {
     switch(status) {
       case 'pendente': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
@@ -322,7 +314,7 @@ export default function FoodBusinessApp() {
     return { totalSales, totalOrders, pendingOrders, activeDeliveries };
   };
 
-  // --- RENDERIZAÇÃO DE TELAS ---
+  // --- TELAS ---
 
   const LandingPage = () => (
     <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white text-center font-serif">
@@ -338,11 +330,11 @@ export default function FoodBusinessApp() {
           <ShoppingBag size={40} className="mb-4 text-orange-800 group-hover:scale-110 transition-transform" />
           <span className="text-xl font-bold uppercase tracking-wider">Cardápio</span>
         </button>
-        <button onClick={() => { setIsAdminMode(true); setView('admin'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
+        <button onClick={() => { setIsAdminMode(false); setView('admin'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
           <LayoutDashboard size={40} className="mb-4 text-stone-400 group-hover:scale-110 transition-transform" />
           <span className="text-xl font-bold uppercase tracking-wider">Gestão</span>
         </button>
-        <button onClick={() => { setIsDriverMode(true); setView('driver'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
+        <button onClick={() => { setIsDriverMode(false); setView('driver'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
           <Bike size={40} className="mb-4 text-stone-400 group-hover:scale-110 transition-transform" />
           <span className="text-xl font-bold uppercase tracking-wider">Entregas</span>
         </button>
@@ -450,7 +442,16 @@ export default function FoodBusinessApp() {
   };
 
   const AdminArea = () => {
-    if (!user || (!isAdminMode && user.isAnonymous)) return <LoginScreen role="admin" onLogin={() => setIsAdminMode(true)} onBack={() => { setView('landing'); setIsAdminMode(false); }} />;
+    // PROTEÇÃO ESTRITA: Se o modo Admin não estiver explicitamente ativo, pede login
+    if (!isAdminMode) {
+        return (
+            <LoginScreen 
+                role="admin" 
+                onLogin={() => setIsAdminMode(true)} 
+                onBack={() => { setView('landing'); setIsAdminMode(false); }} 
+            />
+        );
+    }
     
     const stats = calculateStats();
 
@@ -571,7 +572,16 @@ export default function FoodBusinessApp() {
   };
 
   const DriverArea = () => {
-    if (!user || (!isDriverMode && user.isAnonymous)) return <LoginScreen role="driver" onLogin={() => setIsDriverMode(true)} onBack={() => { setView('landing'); setIsDriverMode(false); }} />;
+    // PROTEÇÃO ESTRITA: Se o modo Driver não estiver explicitamente ativo, pede login
+    if (!isDriverMode) {
+        return (
+            <LoginScreen 
+                role="driver" 
+                onLogin={() => setIsDriverMode(true)} 
+                onBack={() => { setView('landing'); setIsDriverMode(false); }} 
+            />
+        );
+    }
     
     const availableOrders = orders.filter(o => o.status === 'pronto');
     const myDeliveries = orders.filter(o => o.status === 'em_entrega');
