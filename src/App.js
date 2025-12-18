@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
-  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store
+  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -333,7 +333,7 @@ const CustomerApp = () => {
 // 2. MÓDULO DE GESTÃO (ADMIN APP)
 // ==========================================
 
-const LoginScreen = ({ onLogin }) => {
+const LoginScreen = ({ title = "Sistema de Gestão", onLogin }) => {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
@@ -354,14 +354,14 @@ const LoginScreen = ({ onLogin }) => {
       <div className="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md border-t-4 border-orange-800">
         <div className="text-center mb-8">
           <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-orange-200"><Lock className="text-orange-800" size={32} /></div>
-          <h2 className="text-2xl font-bold text-gray-800">Sistema de Gestão</h2>
+          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
           <p className="text-gray-500 italic">Área restrita para equipe</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none" placeholder="ex: admin@davanzo.com"/></div>
+          <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">E-mail</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none" placeholder="ex: equipe@davanzo.com"/></div>
           <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">Senha</label><input type="password" value={pass} onChange={(e) => setPass(e.target.value)} className="w-full p-3 border border-gray-300 rounded-md outline-none" placeholder="••••••"/></div>
           {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-100 text-center">{error}</div>}
-          <button type="submit" className="w-full py-3 bg-stone-800 text-white rounded-md font-bold hover:bg-stone-900 transition-colors uppercase tracking-wider text-sm shadow-lg">Entrar no Sistema</button>
+          <button type="submit" className="w-full py-3 bg-stone-800 text-white rounded-md font-bold hover:bg-stone-900 transition-colors uppercase tracking-wider text-sm shadow-lg">Entrar</button>
         </form>
       </div>
     </div>
@@ -379,8 +379,7 @@ const AdminApp = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      // CORREÇÃO: Só autentica se o usuário existir E NÃO FOR ANÔNIMO
-      // Isso impede que o login automático do cliente libere o admin
+      // Verifica se é um usuário autenticado REAL (não anônimo)
       if (currentUser && !currentUser.isAnonymous) {
         setIsAuthenticated(true);
       } else {
@@ -580,7 +579,110 @@ const AdminApp = () => {
 };
 
 // ==========================================
-// 3. COMPONENTE PRINCIPAL COM ROTEAMENTO
+// 3. MÓDULO DO ENTREGADOR (DRIVER APP)
+// ==========================================
+
+const DriverApp = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [orders, setOrders] = useState([]);
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      // Entregador também precisa ser usuário real
+      if (currentUser && !currentUser.isAnonymous) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Orders
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const unsubOrders = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), (snap) => {
+      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setOrders(items);
+    });
+    return () => unsubOrders();
+  }, [isAuthenticated]);
+
+  const updateOrderStatus = async (id, status) => {
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status });
+  };
+
+  if (!isAuthenticated) return <LoginScreen title="Área do Entregador" onLogin={() => setIsAuthenticated(true)} />;
+
+  return (
+    <div className="min-h-screen bg-stone-100 font-sans pb-20">
+      <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-lg">
+        <h2 className="font-bold text-lg flex gap-2 items-center"><Bike className="text-green-500" /> Entregas</h2>
+        <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20} /></button>
+      </header>
+
+      <main className="p-4 space-y-6">
+        
+        {/* DISPONÍVEIS PARA PEGAR */}
+        <div>
+          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-green-500">Prontos na Cozinha</h3>
+          <div className="space-y-3">
+            {orders.filter(o => o.status === 'pronto').map(order => (
+              <div key={order.id} className="bg-white p-4 rounded-md shadow-sm border border-stone-200 animate-in slide-in-from-left duration-300">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold text-xl">{order.customer}</span>
+                  <span className="bg-stone-100 text-stone-500 text-xs px-2 py-1 rounded font-mono">#{order.id.slice(0,4)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4 bg-stone-50 p-2 rounded">
+                  <MapPin size={16} className="shrink-0"/> {order.address}
+                </div>
+                <button onClick={() => updateOrderStatus(order.id, 'em_entrega')} className="w-full py-3 bg-stone-900 text-white font-bold rounded shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                  <Bike size={20}/> INICIAR ROTA
+                </button>
+              </div>
+            ))}
+            {orders.filter(o => o.status === 'pronto').length === 0 && (
+              <p className="text-center text-stone-400 text-sm py-4 italic">Nenhum pedido aguardando.</p>
+            )}
+          </div>
+        </div>
+
+        {/* EM ANDAMENTO */}
+        <div>
+          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-purple-500">Minhas Entregas em Curso</h3>
+          <div className="space-y-3">
+            {orders.filter(o => o.status === 'em_entrega').map(order => (
+              <div key={order.id} className="bg-white p-4 rounded-md shadow-md border-l-4 border-purple-600 animate-in zoom-in duration-300">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold text-xl">{order.customer}</span>
+                  <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
+                </div>
+                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4">
+                  <MapPin size={16} className="shrink-0"/> {order.address}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="py-3 bg-stone-100 text-stone-700 font-bold rounded text-xs hover:bg-stone-200">MAPA</button>
+                  <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-3 bg-green-600 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform">
+                    <CheckCircle size={16}/> ENTREGUE
+                  </button>
+                </div>
+              </div>
+            ))}
+            {orders.filter(o => o.status === 'em_entrega').length === 0 && (
+              <p className="text-center text-stone-400 text-sm py-4 italic">Você não tem entregas ativas.</p>
+            )}
+          </div>
+        </div>
+
+      </main>
+    </div>
+  );
+};
+
+// ==========================================
+// 4. COMPONENTE PRINCIPAL COM ROTEAMENTO
 // ==========================================
 
 export default function IntegratedApp() {
@@ -595,6 +697,10 @@ export default function IntegratedApp() {
   // Roteamento Simples (Hash Router)
   if (currentRoute === '#/admin') {
     return <AdminApp />;
+  }
+  
+  if (currentRoute === '#/driver') {
+    return <DriverApp />;
   }
 
   // Rota padrão (Cliente)
