@@ -422,7 +422,7 @@ const AdminArea = ({
         {adminTab === 'dashboard' && (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-stone-800 font-serif">Visão Geral</h2>
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-green-600">
                 <h3 className="text-stone-500 text-sm font-bold uppercase">Faturamento</h3>
                 <p className="text-3xl font-bold text-stone-900">{formatCurrency(stats.totalSales)}</p>
@@ -474,7 +474,7 @@ const AdminArea = ({
                <h2 className="text-2xl font-bold text-stone-800 font-serif">Cardápio</h2>
                <button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: ''}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-sm font-bold text-sm">NOVO ITEM</button>
              </div>
-             <div className="bg-white rounded-sm shadow-sm border border-stone-200">
+             <div className="bg-white rounded-sm shadow-sm border border-stone-200 overflow-x-auto">
                <table className="w-full text-left">
                  <thead className="bg-stone-100 text-stone-500 font-bold text-xs uppercase">
                    <tr><th className="p-4">Item</th><th className="p-4">Preço</th><th className="p-4 text-right">Ações</th></tr>
@@ -482,9 +482,9 @@ const AdminArea = ({
                  <tbody className="divide-y divide-stone-100">
                    {products.map(p => (
                      <tr key={p.id}>
-                       <td className="p-4 flex items-center gap-3"><img src={p.image} className="w-10 h-10 rounded-sm bg-stone-200"/> <span>{p.name}</span></td>
+                       <td className="p-4 flex items-center gap-3 min-w-[200px]"><img src={p.image} className="w-10 h-10 rounded-sm bg-stone-200"/> <span>{p.name}</span></td>
                        <td className="p-4 font-bold">{formatCurrency(p.price)}</td>
-                       <td className="p-4 text-right">
+                       <td className="p-4 text-right min-w-[150px]">
                          <button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="text-blue-700 font-bold text-sm mr-3">EDITAR</button>
                          <button onClick={() => handleDeleteProduct(p.id)} className="text-red-600 font-bold text-sm">EXCLUIR</button>
                        </td>
@@ -499,7 +499,7 @@ const AdminArea = ({
         {isProductFormOpen && editingProduct && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-stone-900/60" onClick={() => setIsProductFormOpen(false)} />
-            <div className="relative bg-white rounded-sm shadow-2xl w-full max-w-lg p-6 space-y-4">
+            <div className="relative bg-white rounded-sm shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto m-4">
                <h3 className="font-bold text-lg uppercase">{editingProduct.id ? 'Editar' : 'Novo'} Produto</h3>
                <input className="w-full p-2 border border-stone-300" placeholder="Nome" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} autoFocus />
                
