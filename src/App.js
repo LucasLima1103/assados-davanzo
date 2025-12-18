@@ -203,7 +203,7 @@ const CustomerArea = ({
   const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => p.category === activeCategory);
   
   // GERAÇÃO DO PAYLOAD PIX (Atualiza quando o total do carrinho muda)
-  const pixKey = "lucaslima1103@outloo.com";
+  const pixKey = "lucaslima1103@outlook.com";
   const pixPayload = useMemo(() => {
     return generatePix(pixKey, "FAMILIA DAVANZO", "SAO PAULO", cartTotal > 0 ? cartTotal : 0);
   }, [cartTotal]);
