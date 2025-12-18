@@ -3,7 +3,7 @@ import {
   ShoppingBag, ChefHat, UtensilsCrossed, Plus, Minus, Trash2, CheckCircle, 
   Clock, DollarSign, LayoutDashboard, Package, Menu, X, ArrowRight, 
   TrendingUp, Bike, MapPin, Navigation, CheckSquare, Lock, Phone, Send, 
-  Save, Edit, Image as ImageIcon, Copy 
+  Save, Edit, Image as ImageIcon, Copy, Upload, Loader 
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -24,6 +24,12 @@ import {
   doc, 
   onSnapshot 
 } from 'firebase/firestore';
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from 'firebase/storage';
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
 const manualConfig = {
@@ -40,6 +46,7 @@ const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__f
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app); // Inicializa o Storage
 
 const APP_ID = 'assados-davanzo-prod'; 
 
@@ -203,7 +210,7 @@ const CustomerArea = ({
   const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => p.category === activeCategory);
   
   // GERAÇÃO DO PAYLOAD PIX (Atualiza quando o total do carrinho muda)
-  const pixKey = "lucaslima1103@outlook.com";
+  const pixKey = "lucaslima1103@outloo.com";
   const pixPayload = useMemo(() => {
     return generatePix(pixKey, "FAMILIA DAVANZO", "SAO PAULO", cartTotal > 0 ? cartTotal : 0);
   }, [cartTotal]);
@@ -351,6 +358,32 @@ const AdminArea = ({
   updateOrderStatus, handleSaveProduct, handleDeleteProduct,
   isProductFormOpen, setIsProductFormOpen, editingProduct, setEditingProduct
 }) => {
+  // Estado para controle de upload
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Função para upload de imagem
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      // Cria uma referência única para o arquivo
+      const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
+      // Faz o upload
+      await uploadBytes(storageRef, file);
+      // Obtém a URL de download
+      const url = await getDownloadURL(storageRef);
+      // Atualiza o estado do produto com a nova URL
+      setEditingProduct(prev => ({ ...prev, image: url }));
+    } catch (error) {
+      console.error("Erro no upload:", error);
+      alert("Erro ao fazer upload da imagem.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   if (!isAdminMode) {
       return (
           <LoginScreen 
@@ -469,7 +502,33 @@ const AdminArea = ({
             <div className="relative bg-white rounded-sm shadow-2xl w-full max-w-lg p-6 space-y-4">
                <h3 className="font-bold text-lg uppercase">{editingProduct.id ? 'Editar' : 'Novo'} Produto</h3>
                <input className="w-full p-2 border border-stone-300" placeholder="Nome" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} autoFocus />
-               <input className="w-full p-2 border border-stone-300" placeholder="URL da Imagem" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
+               
+               {/* --- ÁREA DE UPLOAD DE IMAGEM --- */}
+               <div className="border border-stone-300 p-4 rounded-sm bg-stone-50">
+                  <label className="block text-xs font-bold text-stone-500 uppercase mb-2">Imagem do Produto</label>
+                  <div className="flex gap-2 mb-2">
+                    <input className="w-full p-2 border border-stone-300 bg-white" placeholder="URL da imagem (ou envie foto abaixo)" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
+                  </div>
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload}
+                      className="hidden" 
+                      id="imageUpload"
+                      disabled={isUploading}
+                    />
+                    <label 
+                      htmlFor="imageUpload" 
+                      className={`flex items-center justify-center gap-2 w-full p-2 border-2 border-dashed border-stone-300 rounded-sm cursor-pointer hover:bg-stone-100 transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                       {isUploading ? <Loader className="animate-spin" size={20}/> : <Upload size={20} />}
+                       <span className="text-sm font-bold text-stone-600">{isUploading ? 'Enviando...' : 'Carregar Foto da Galeria'}</span>
+                    </label>
+                  </div>
+               </div>
+               {/* --------------------------------- */}
+
                <div className="grid grid-cols-2 gap-4">
                   <input className="w-full p-2 border border-stone-300" type="number" placeholder="Preço" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} />
                   <select className="w-full p-2 border border-stone-300" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
