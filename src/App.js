@@ -584,7 +584,6 @@ const DriverArea = ({
 export default function App() {
   // Estado Global
   const [view, setView] = useState('landing'); // landing, customer, admin, driver
-  const [user, setUser] = useState(null);
   
   // Estado de Dados
   const [products, setProducts] = useState([]);
@@ -609,7 +608,6 @@ export default function App() {
   useEffect(() => {
     // Escuta estado de auth
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-       setUser(currentUser);
        if (currentUser) {
            // Se logado, conecta nos dados
            const productsRef = collection(db, 'products');
