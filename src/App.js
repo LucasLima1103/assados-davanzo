@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingBag, ChefHat, UtensilsCrossed, Plus, Minus, Trash2, CheckCircle, 
   Clock, DollarSign, LayoutDashboard, Package, Menu, X, ArrowRight, 
   TrendingUp, Bike, MapPin, Navigation, CheckSquare, Lock, Phone, Send, 
-  Save, Edit, Image as ImageIcon 
+  Save, Edit, Image as ImageIcon, Copy 
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -26,7 +26,6 @@ import {
 } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
-// 🔴 🔴 🔴 SUBSTITUA COM SUAS CHAVES AQUI SE NECESSÁRIO 🔴 🔴 🔴
 const manualConfig = {
   apiKey: "AIzaSyC47npvRo_nBky0R6J-27eMc4h4KZLAjqw",
   authDomain: "assados-familia-davanzo.firebaseapp.com",
@@ -37,16 +36,52 @@ const manualConfig = {
   measurementId: "G-Q240S9258G"
 };
 
-// Inicialização segura
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ID do App para separar dados
 const APP_ID = 'assados-davanzo-prod'; 
 
-// --- FUNÇÕES AUXILIARES ---
+// --- FUNÇÕES AUXILIARES PIX ---
+const crc16ccitt = (str) => {
+  let crc = 0xFFFF;
+  for (let c = 0; c < str.length; c++) {
+    crc ^= str.charCodeAt(c) << 8;
+    for (let i = 0; i < 8; i++) {
+      if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
+      else crc = crc << 1;
+    }
+  }
+  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+};
+
+const generatePix = (key, name, city, amount, txtId = '***') => {
+  const formatField = (id, value) => {
+    const len = value.length.toString().padStart(2, '0');
+    return `${id}${len}${value}`;
+  };
+
+  let payload = 
+    formatField('00', '01') + // Payload Format Indicator
+    formatField('26', // Merchant Account Information
+      formatField('00', 'br.gov.bcb.pix') +
+      formatField('01', key)
+    ) +
+    formatField('52', '0000') + // Merchant Category Code
+    formatField('53', '986') + // Transaction Currency (BRL)
+    formatField('54', amount.toFixed(2)) + // Transaction Amount
+    formatField('58', 'BR') + // Country Code
+    formatField('59', name) + // Merchant Name
+    formatField('60', city) + // Merchant City
+    formatField('62', formatField('05', txtId)) + // Additional Data Field Template
+    '6304'; // CRC16 ID + Length
+
+  payload += crc16ccitt(payload);
+  return payload;
+};
+
+// --- FUNÇÕES AUXILIARES GERAIS ---
 const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const Badge = ({ children, color }) => (
@@ -66,7 +101,7 @@ const getStatusColor = (status) => {
   }
 };
 
-// --- COMPONENTES (DEFINIDOS FORA DA APP PRINCIPAL PARA EVITAR RE-RENDER BUG) ---
+// --- COMPONENTES ---
 
 const LoginScreen = ({ role, onLogin, onBack }) => {
   const [email, setEmail] = useState('');
@@ -166,6 +201,17 @@ const CustomerArea = ({
 }) => {
   const categories = ['Todos', ...new Set(products.map(p => p.category))];
   const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => p.category === activeCategory);
+  
+  // GERAÇÃO DO PAYLOAD PIX (Atualiza quando o total do carrinho muda)
+  const pixKey = "lucaslima1103@outloo.com";
+  const pixPayload = useMemo(() => {
+    return generatePix(pixKey, "FAMILIA DAVANZO", "SAO PAULO", cartTotal > 0 ? cartTotal : 0);
+  }, [cartTotal]);
+
+  const copyPix = () => {
+    navigator.clipboard.writeText(pixPayload);
+    alert("Código Pix copiado!");
+  };
 
   return (
     <div className="min-h-screen bg-stone-50 pb-20 font-sans">
@@ -245,7 +291,6 @@ const CustomerArea = ({
                     <input type="tel" placeholder="WhatsApp *" className="w-full p-2 border border-stone-200 rounded-sm" value={checkoutForm.whatsapp} onChange={e => setCheckoutForm({...checkoutForm, whatsapp: e.target.value})} />
                     <textarea placeholder="Endereço *" className="w-full p-2 border border-stone-200 rounded-sm h-20 resize-none" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} />
                     
-                    {/* --- NOVO CAMPO DE PAGAMENTO --- */}
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-stone-500 uppercase">Forma de Pagamento</label>
                       <select 
@@ -259,7 +304,28 @@ const CustomerArea = ({
                         <option value="Cartão de Débito">Cartão de Débito</option>
                       </select>
                     </div>
-                    {/* ------------------------------- */}
+
+                    {/* --- ÁREA DO PIX --- */}
+                    {checkoutForm.paymentMethod === 'Pix' && (
+                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-sm flex flex-col items-center animate-in fade-in slide-in-from-top-2">
+                        <span className="text-xs font-bold text-blue-800 mb-2 uppercase tracking-wide">Pague via Pix</span>
+                        <div className="bg-white p-2 rounded-sm mb-3 shadow-sm">
+                           {/* Usa API publica para gerar QR da string Pix gerada */}
+                           <img 
+                             src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixPayload)}`} 
+                             alt="QR Code Pix" 
+                             className="w-40 h-40 mix-blend-multiply"
+                           />
+                        </div>
+                        <p className="text-xs text-center text-gray-500 mb-2 font-mono break-all px-2 bg-white rounded border border-gray-100 py-1 w-full truncate">
+                          {pixKey}
+                        </p>
+                        <button onClick={copyPix} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-full hover:bg-blue-700 transition-colors">
+                          <Copy size={14} /> COPIAR CÓDIGO PIX
+                        </button>
+                      </div>
+                    )}
+                    {/* ------------------- */}
 
                     <textarea placeholder="Obs" className="w-full p-2 border border-stone-200 rounded-sm h-16 resize-none" value={checkoutForm.notes} onChange={e => setCheckoutForm({...checkoutForm, notes: e.target.value})} />
                   </div>
