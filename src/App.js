@@ -3,7 +3,7 @@ import {
   ShoppingBag, ChefHat, UtensilsCrossed, Plus, Minus, Trash2, CheckCircle, 
   Clock, DollarSign, LayoutDashboard, Package, Menu, X, ArrowRight, 
   TrendingUp, Bike, MapPin, Navigation, CheckSquare, Lock, Phone, Send, 
-  Save, Edit, Image as ImageIcon 
+  Save, Edit, Image as ImageIcon, LogOut
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -197,7 +197,13 @@ const CustomerArea = ({
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-sm shadow-sm border border-stone-200 overflow-hidden flex flex-col group">
               <div className="h-48 w-full relative overflow-hidden bg-stone-100">
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                {product.image ? (
+                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                ) : (
+                   <div className="w-full h-full flex items-center justify-center text-stone-400">
+                     <ImageIcon size={48} />
+                   </div>
+                )}
               </div>
               <div className="p-6 flex-1 flex flex-col">
                 <h3 className="font-bold text-stone-800 text-lg font-serif">{product.name}</h3>
@@ -268,6 +274,16 @@ const AdminArea = ({
   updateOrderStatus, handleSaveProduct, handleDeleteProduct,
   isProductFormOpen, setIsProductFormOpen, editingProduct, setEditingProduct
 }) => {
+  const [productForm, setProductForm] = useState({ name: '', price: '', category: 'Assados', description: '', image: '' });
+
+  useEffect(() => {
+    if (editingProduct) {
+      setProductForm(editingProduct);
+    } else {
+      setProductForm({ name: '', price: '', category: 'Assados', description: '', image: '' });
+    }
+  }, [editingProduct]);
+
   if (!isAdminMode) {
       return (
           <LoginScreen 
@@ -279,10 +295,15 @@ const AdminArea = ({
   }
   
   const stats = {
-    totalSales: orders.reduce((acc, o) => acc + (o.total || 0), 0),
+    totalSales: orders.filter(o => o.status !== 'cancelado').reduce((acc, o) => acc + (o.total || 0), 0),
     totalOrders: orders.length,
     pendingOrders: orders.filter(o => o.status === 'pendente' || o.status === 'preparando').length,
     activeDeliveries: orders.filter(o => o.status === 'em_entrega').length
+  };
+
+  const handleProductSubmit = (e) => {
+    e.preventDefault();
+    handleSaveProduct(productForm);
   };
 
   return (
@@ -293,26 +314,32 @@ const AdminArea = ({
           <div><h2 className="font-bold text-lg font-serif">Admin</h2></div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setAdminTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'dashboard' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><LayoutDashboard size={20}/> Dashboard</button>
-          <button onClick={() => setAdminTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'orders' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><Package size={20}/> Pedidos (KDS)</button>
-          <button onClick={() => setAdminTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'menu' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><Menu size={20}/> Cardápio</button>
+          <button onClick={() => setAdminTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors ${adminTab === 'dashboard' ? 'bg-orange-900 text-white shadow-md' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}><LayoutDashboard size={20}/> Dashboard</button>
+          <button onClick={() => setAdminTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors ${adminTab === 'orders' ? 'bg-orange-900 text-white shadow-md' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}><Package size={20}/> Pedidos (KDS)</button>
+          <button onClick={() => setAdminTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors ${adminTab === 'menu' ? 'bg-orange-900 text-white shadow-md' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}><Menu size={20}/> Cardápio</button>
         </nav>
         <div className="p-4 border-t border-stone-800">
-           <button onClick={() => { signOut(auth); setView('landing'); setIsAdminMode(false); }} className="text-stone-500 hover:text-white flex gap-2"><ArrowRight className="rotate-180"/> Sair</button>
+           <button onClick={() => { signOut(auth); setView('landing'); setIsAdminMode(false); }} className="w-full flex items-center gap-2 text-stone-500 hover:text-white transition-colors px-4 py-2"><LogOut size={18}/> Sair</button>
         </div>
       </aside>
-
-      <main className="flex-1 p-6 overflow-y-auto">
+      
+      <main className="flex-1 p-6 overflow-y-auto h-screen">
         {adminTab === 'dashboard' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-stone-800 font-serif">Visão Geral</h2>
-            <div className="grid grid-cols-4 gap-6">
-              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-green-600">
-                <h3 className="text-stone-500 text-sm font-bold uppercase">Faturamento</h3>
+          <div className="space-y-6 animate-fade-in">
+            <h2 className="text-2xl font-bold text-stone-800 font-serif border-l-4 border-orange-800 pl-4">Visão Geral</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-green-600 rounded-sm">
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-stone-500 text-xs font-bold uppercase tracking-wider">Faturamento</h3>
+                    <DollarSign className="text-green-600" size={20} />
+                </div>
                 <p className="text-3xl font-bold text-stone-900">{formatCurrency(stats.totalSales)}</p>
               </div>
-              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-orange-600">
-                <h3 className="text-stone-500 text-sm font-bold uppercase">Pedidos</h3>
+              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-blue-600 rounded-sm">
+                 <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-stone-500 text-xs font-bold uppercase tracking-wider">Pedidos Totais</h3>
+                    <Package className="text-blue-600" size={20} />
+                </div>
                 <p className="text-3xl font-bold text-stone-900">{stats.totalOrders}</p>
               </div>
             </div>
@@ -320,26 +347,45 @@ const AdminArea = ({
         )}
 
         {adminTab === 'orders' && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-stone-800 font-serif">KDS - Cozinha</h2>
+          <div className="space-y-6 animate-fade-in">
+            <h2 className="text-2xl font-bold text-stone-800 font-serif border-l-4 border-orange-800 pl-4">KDS - Cozinha</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {orders.filter(o => o.status !== 'entregue').map(order => (
-                <div key={order.id} className="bg-white rounded-sm shadow-sm border border-stone-200 flex flex-col">
-                  <div className="p-4 border-b bg-stone-50 flex justify-between">
-                    <span className="font-mono font-bold">#{order.id.slice(0, 4)}</span>
-                    <Badge color={getStatusColor(order.status)}>{order.status.toUpperCase()}</Badge>
+              {orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado').map(order => (
+                <div key={order.id} className="bg-white rounded-sm shadow-md border border-stone-200 flex flex-col overflow-hidden">
+                  <div className={`p-4 border-b flex justify-between items-center ${order.status === 'pendente' ? 'bg-yellow-50' : 'bg-white'}`}>
+                    <span className="font-mono font-bold text-stone-600">#{order.id.slice(0, 4)}</span>
+                    <Badge color={getStatusColor(order.status)}>{order.status}</Badge>
                   </div>
-                  <div className="p-4 flex-1">
-                    <h4 className="font-bold text-lg font-serif">{order.customer}</h4>
-                    <p className="text-xs text-stone-500 mb-2">{order.address}</p>
-                    <ul className="bg-yellow-50 p-3 rounded-sm text-sm space-y-1">
-                      {order.items?.map((i, idx) => <li key={idx}><b>{i.qty}x</b> {i.name}</li>)}
+                  <div className="p-5 flex-1 space-y-4">
+                    <div>
+                        <h4 className="font-bold text-lg font-serif text-stone-800">{order.customer}</h4>
+                        {order.notes && <p className="text-xs text-red-600 bg-red-50 p-2 mt-1 rounded border border-red-100 font-bold">Obs: {order.notes}</p>}
+                    </div>
+                    <ul className="bg-stone-50 p-3 rounded-sm text-sm space-y-2 border border-stone-100">
+                      {order.items?.map((i, idx) => (
+                          <li key={idx} className="flex justify-between border-b border-stone-200 pb-1 last:border-0 last:pb-0">
+                              <span>{i.name}</span>
+                              <span className="font-bold">x{i.qty}</span>
+                          </li>
+                      ))}
                     </ul>
                   </div>
-                  <div className="p-4 grid grid-cols-2 gap-2 bg-stone-50">
-                    {order.status === 'pendente' && <button onClick={() => updateOrderStatus(order.id, 'preparando')} className="col-span-2 py-2 bg-blue-700 text-white font-bold rounded-sm">INICIAR</button>}
-                    {order.status === 'preparando' && <button onClick={() => updateOrderStatus(order.id, 'pronto')} className="col-span-2 py-2 bg-green-700 text-white font-bold rounded-sm">PRONTO</button>}
-                    {order.status === 'pronto' && <div className="col-span-2 text-center text-green-800 font-bold py-2 bg-green-100 rounded-sm">AGUARDANDO</div>}
+                  <div className="p-4 grid grid-cols-2 gap-2 bg-stone-50 border-t border-stone-100">
+                    {order.status === 'pendente' && (
+                        <button onClick={() => updateOrderStatus(order.id, 'preparando')} className="col-span-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-sm transition-colors flex justify-center items-center gap-2">
+                            <UtensilsCrossed size={16}/> INICIAR PREPARO
+                        </button>
+                    )}
+                    {order.status === 'preparando' && (
+                        <button onClick={() => updateOrderStatus(order.id, 'pronto')} className="col-span-2 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-sm transition-colors flex justify-center items-center gap-2">
+                            <CheckCircle size={16}/> MARCAR PRONTO
+                        </button>
+                    )}
+                    {order.status === 'pronto' && (
+                        <div className="col-span-2 text-center text-green-800 font-bold py-3 bg-green-100 rounded-sm border border-green-200 flex justify-center items-center gap-2">
+                             AGUARDANDO ENTREGADOR
+                        </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -348,52 +394,78 @@ const AdminArea = ({
         )}
 
         {adminTab === 'menu' && (
-           <div className="space-y-6">
-             <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-bold text-stone-800 font-serif">Cardápio</h2>
-               <button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados'}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-sm font-bold text-sm">NOVO ITEM</button>
+          <div className="space-y-6 animate-fade-in">
+             <div className="flex justify-between items-center border-b pb-4 border-stone-200">
+                <h2 className="text-2xl font-bold text-stone-800 font-serif border-l-4 border-orange-800 pl-4">Gerenciar Cardápio</h2>
+                <button onClick={() => { setEditingProduct(null); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-800 text-white rounded-sm font-bold hover:bg-stone-900 flex items-center gap-2">
+                    <Plus size={18}/> Novo Produto
+                </button>
              </div>
-             <div className="bg-white rounded-sm shadow-sm border border-stone-200">
-               <table className="w-full text-left">
-                 <thead className="bg-stone-100 text-stone-500 font-bold text-xs uppercase">
-                   <tr><th className="p-4">Item</th><th className="p-4">Preço</th><th className="p-4 text-right">Ações</th></tr>
-                 </thead>
-                 <tbody className="divide-y divide-stone-100">
-                   {products.map(p => (
-                     <tr key={p.id}>
-                       <td className="p-4 flex items-center gap-3"><img src={p.image} className="w-10 h-10 rounded-sm bg-stone-200"/> <span>{p.name}</span></td>
-                       <td className="p-4 font-bold">{formatCurrency(p.price)}</td>
-                       <td className="p-4 text-right">
-                         <button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="text-blue-700 font-bold text-sm mr-3">EDITAR</button>
-                         <button onClick={() => handleDeleteProduct(p.id)} className="text-red-600 font-bold text-sm">EXCLUIR</button>
-                       </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-             </div>
-           </div>
-        )}
 
-        {isProductFormOpen && editingProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-stone-900/60" onClick={() => setIsProductFormOpen(false)} />
-            <div className="relative bg-white rounded-sm shadow-2xl w-full max-w-lg p-6 space-y-4">
-               <h3 className="font-bold text-lg uppercase">{editingProduct.id ? 'Editar' : 'Novo'} Produto</h3>
-               <input className="w-full p-2 border border-stone-300" placeholder="Nome" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} autoFocus />
-               <input className="w-full p-2 border border-stone-300" placeholder="URL da Imagem" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
-               <div className="grid grid-cols-2 gap-4">
-                  <input className="w-full p-2 border border-stone-300" type="number" placeholder="Preço" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} />
-                  <select className="w-full p-2 border border-stone-300" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
-                    <option>Assados</option><option>Acompanhamentos</option><option>Sobremesas</option>
-                  </select>
-               </div>
-               <textarea className="w-full p-2 border border-stone-300" placeholder="Descrição" value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} />
-               <div className="flex justify-end gap-2 pt-4">
-                 <button onClick={() => setIsProductFormOpen(false)} className="px-4 py-2 text-stone-600 font-bold">CANCELAR</button>
-                 <button onClick={handleSaveProduct} className="px-6 py-2 bg-green-700 text-white font-bold rounded-sm">SALVAR</button>
-               </div>
-            </div>
+             {/* Formulário de Produto */}
+             {isProductFormOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 backdrop-blur-sm p-4">
+                     <div className="bg-white rounded-sm shadow-xl max-w-lg w-full p-6 border-t-4 border-orange-800">
+                         <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold font-serif">{editingProduct ? 'Editar Produto' : 'Novo Produto'}</h3>
+                            <button onClick={() => setIsProductFormOpen(false)}><X size={24}/></button>
+                         </div>
+                         <form onSubmit={handleProductSubmit} className="space-y-4">
+                             <div>
+                                 <label className="block text-sm font-bold text-stone-600 mb-1">Nome</label>
+                                 <input required type="text" className="w-full p-2 border border-stone-300 rounded-sm" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
+                             </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-stone-600 mb-1">Preço (R$)</label>
+                                    <input required type="number" step="0.01" className="w-full p-2 border border-stone-300 rounded-sm" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-stone-600 mb-1">Categoria</label>
+                                    <select className="w-full p-2 border border-stone-300 rounded-sm" value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})}>
+                                        <option>Assados</option>
+                                        <option>Acompanhamentos</option>
+                                        <option>Bebidas</option>
+                                        <option>Combos</option>
+                                    </select>
+                                </div>
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-bold text-stone-600 mb-1">Descrição</label>
+                                 <textarea className="w-full p-2 border border-stone-300 rounded-sm h-20" value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
+                             </div>
+                             <div>
+                                 <label className="block text-sm font-bold text-stone-600 mb-1">URL da Imagem</label>
+                                 <input type="url" className="w-full p-2 border border-stone-300 rounded-sm" placeholder="https://..." value={productForm.image} onChange={e => setProductForm({...productForm, image: e.target.value})} />
+                             </div>
+                             <button type="submit" className="w-full py-3 bg-orange-800 text-white font-bold rounded-sm hover:bg-orange-900 mt-4">
+                                 {editingProduct ? 'ATUALIZAR' : 'CADASTRAR'}
+                             </button>
+                         </form>
+                     </div>
+                 </div>
+             )}
+
+             <div className="grid gap-4">
+                {products.map(p => (
+                    <div key={p.id} className="bg-white p-4 rounded-sm shadow-sm border border-stone-200 flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 bg-stone-100 rounded-sm overflow-hidden">
+                                {p.image ? <img src={p.image} className="w-full h-full object-cover"/> : <ImageIcon className="m-auto mt-4 text-stone-400"/>}
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-stone-800">{p.name}</h4>
+                                <span className="text-xs font-bold text-stone-500 uppercase">{p.category}</span>
+                                <span className="ml-3 text-orange-800 font-bold">{formatCurrency(p.price)}</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="p-2 text-stone-500 hover:bg-stone-100 rounded"><Edit size={18}/></button>
+                            <button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
+                        </div>
+                    </div>
+                ))}
+             </div>
           </div>
         )}
       </main>
@@ -401,227 +473,283 @@ const AdminArea = ({
   );
 };
 
-const DriverArea = ({
-  user, auth, isDriverMode, setIsDriverMode, setView,
-  orders, driverTab, setDriverTab, updateOrderStatus
+const DriverArea = ({ 
+  user, auth, isDriverMode, setIsDriverMode, setView, 
+  orders, driverTab, setDriverTab, updateOrderStatus 
 }) => {
-  if (!isDriverMode) {
-      return (
-          <LoginScreen 
-              role="driver" 
-              onLogin={() => setIsDriverMode(true)} 
-              onBack={() => { setView('landing'); setIsDriverMode(false); }} 
-          />
-      );
-  }
-  
-  const availableOrders = orders.filter(o => o.status === 'pronto');
-  const myDeliveries = orders.filter(o => o.status === 'em_entrega');
+    if (!isDriverMode) {
+        return (
+            <LoginScreen 
+                role="driver" 
+                onLogin={() => setIsDriverMode(true)} 
+                onBack={() => { setView('landing'); setIsDriverMode(false); }} 
+            />
+        );
+    }
 
-  return (
-    <div className="min-h-screen bg-stone-100 flex flex-col font-sans">
-      <header className="bg-stone-900 text-white shadow-lg sticky top-0 z-10 p-4 flex justify-between">
-         <h2 className="font-bold text-lg flex gap-2"><Bike className="text-green-500" /> Área do Entregador</h2>
-         <button onClick={() => { signOut(auth); setView('landing'); setIsDriverMode(false); }}>SAIR</button>
-      </header>
-      <div className="bg-stone-800 grid grid-cols-2">
-         <button onClick={() => setDriverTab('available')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'available' ? 'bg-stone-700 text-white border-b-4 border-white' : 'text-stone-400'}`}>Disponíveis ({availableOrders.length})</button>
-         <button onClick={() => setDriverTab('active')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'active' ? 'bg-stone-700 text-white border-b-4 border-purple-500' : 'text-stone-400'}`}>Em Rota ({myDeliveries.length})</button>
-      </div>
-      <main className="p-4 space-y-4">
-         {driverTab === 'available' && availableOrders.map(o => (
-           <div key={o.id} className="bg-white p-5 rounded-sm border border-stone-200">
-             <h3 className="font-bold text-lg">{o.customer}</h3>
-             <p className="text-stone-500 text-sm mb-3">{o.address}</p>
-             <button onClick={() => updateOrderStatus(o.id, 'em_entrega')} className="w-full py-3 bg-green-700 text-white font-bold rounded-sm">ACEITAR</button>
-           </div>
-         ))}
-         {driverTab === 'active' && myDeliveries.map(o => (
-           <div key={o.id} className="bg-white p-5 rounded-sm border-l-4 border-purple-600 shadow-md">
-             <h3 className="font-bold text-lg">{o.customer}</h3>
-             <p className="text-stone-800 text-sm mb-3 font-bold">{o.address}</p>
-             <div className="grid grid-cols-2 gap-2">
-               <button className="py-2 bg-stone-100 font-bold text-xs">MAPS</button>
-               <button onClick={() => updateOrderStatus(o.id, 'entregue')} className="py-2 bg-stone-800 text-white font-bold text-xs">ENTREGUE</button>
-             </div>
-           </div>
-         ))}
-      </main>
-    </div>
-  );
+    const availableDeliveries = orders.filter(o => o.status === 'pronto');
+    const myDeliveries = orders.filter(o => o.status === 'em_entrega'); // Idealmente filtrar por entregador
+
+    return (
+        <div className="min-h-screen bg-stone-100 font-sans pb-20">
+             <header className="bg-stone-900 text-white p-4 shadow-md sticky top-0 z-10">
+                <div className="max-w-md mx-auto flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                        <Bike className="text-orange-500" size={24} />
+                        <h1 className="font-bold text-lg font-serif">Área do Entregador</h1>
+                    </div>
+                    <button onClick={() => { signOut(auth); setView('landing'); setIsDriverMode(false); }} className="text-xs bg-stone-800 px-3 py-1 rounded border border-stone-700">Sair</button>
+                </div>
+            </header>
+
+            <main className="max-w-md mx-auto p-4 space-y-6">
+                
+                {/* Minhas Entregas Atuais */}
+                <section>
+                    <h2 className="text-stone-800 font-bold mb-3 flex items-center gap-2">
+                        <Navigation size={18} className="text-blue-600"/> Em Rota
+                    </h2>
+                    {myDeliveries.length === 0 ? (
+                         <div className="bg-white p-6 rounded-sm border border-stone-200 text-center text-stone-400 text-sm">
+                             Você não tem entregas ativas.
+                         </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {myDeliveries.map(order => (
+                                <div key={order.id} className="bg-white rounded-sm shadow-md border-l-4 border-l-blue-600 overflow-hidden">
+                                    <div className="p-4">
+                                        <div className="flex justify-between mb-2">
+                                            <span className="font-mono font-bold">#{order.id.slice(0,4)}</span>
+                                            <span className="text-blue-600 font-bold text-xs uppercase">Em andamento</span>
+                                        </div>
+                                        <h3 className="font-bold text-lg mb-1">{order.customer}</h3>
+                                        <div className="flex items-start gap-2 text-stone-600 text-sm bg-stone-50 p-2 rounded">
+                                            <MapPin size={16} className="mt-1 flex-shrink-0 text-red-500" />
+                                            <p>{order.address}</p>
+                                        </div>
+                                        {order.whatsapp && (
+                                            <a href={`https://wa.me/55${order.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 text-green-600 font-bold text-sm hover:underline">
+                                                <Phone size={16} /> Chamar no WhatsApp
+                                            </a>
+                                        )}
+                                        <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
+                                            <span className="text-sm text-stone-500">Total a cobrar: <b className="text-stone-800">{formatCurrency(order.total)}</b></span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => updateOrderStatus(order.id, 'entregue')}
+                                        className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold flex justify-center items-center gap-2"
+                                    >
+                                        <CheckSquare size={18} /> CONFIRMAR ENTREGA
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                {/* Disponíveis para Retirada */}
+                <section>
+                    <h2 className="text-stone-800 font-bold mb-3 flex items-center gap-2">
+                        <Package size={18} className="text-orange-600"/> Aguardando Retirada
+                    </h2>
+                     {availableDeliveries.length === 0 ? (
+                         <div className="bg-stone-50 p-6 rounded-sm border border-dashed border-stone-300 text-center text-stone-400 text-sm">
+                             Nenhum pedido pronto na cozinha.
+                         </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {availableDeliveries.map(order => (
+                                <div key={order.id} className="bg-white rounded-sm shadow-sm border border-stone-200 opacity-90 hover:opacity-100 transition-opacity">
+                                    <div className="p-4">
+                                        <div className="flex justify-between mb-1">
+                                            <span className="font-mono font-bold text-stone-500">#{order.id.slice(0,4)}</span>
+                                            <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-0.5 rounded">PRONTO</span>
+                                        </div>
+                                        <h3 className="font-bold text-stone-800">{order.customer}</h3>
+                                        <p className="text-xs text-stone-500 truncate">{order.address}</p>
+                                    </div>
+                                    <button 
+                                        onClick={() => updateOrderStatus(order.id, 'em_entrega')}
+                                        className="w-full py-3 bg-stone-800 hover:bg-stone-900 text-white font-bold text-sm flex justify-center items-center gap-2"
+                                    >
+                                        <Bike size={16} /> PEGAR ENTREGA
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </main>
+        </div>
+    );
 };
 
-export default function FoodBusinessApp() {
-  const [view, setView] = useState('landing');
+// --- APP PRINCIPAL ---
+const App = () => {
+  // Estado Global
+  const [view, setView] = useState('landing'); // landing, customer, admin, driver
+  const [user, setUser] = useState(null);
+  
+  // Estado de Dados
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [cart, setCart] = useState([]);
-  const [activeCategory, setActiveCategory] = useState('Todos');
-  const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // Estado de Login e Modos
-  const [user, setUser] = useState(null);
+  // Estado de UI
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('Todos');
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '' });
+  
+  // Estado de Acesso
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isDriverMode, setIsDriverMode] = useState(false);
-
-  // Estados Admin
   const [adminTab, setAdminTab] = useState('dashboard');
+  const [driverTab, setDriverTab] = useState('active');
+  
+  // Estado Admin
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // Estados Driver
-  const [driverTab, setDriverTab] = useState('available');
-
-  // Estado Checkout
-  const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '' });
-
-  // 1. EFEITO DE INICIALIZAÇÃO E AUTH
+  // Inicialização Auth e Listeners
   useEffect(() => {
+    // Escuta estado de auth
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) {
-        if (view === 'customer' || view === 'landing') {
-             signInAnonymously(auth).catch(() => {});
-        }
-      }
+       setUser(currentUser);
+       if (currentUser) {
+           // Se logado, conecta nos dados
+           const productsRef = collection(db, 'products');
+           const ordersRef = collection(db, 'orders');
+           
+           const unsubProd = onSnapshot(productsRef, (snap) => {
+               const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+               setProducts(items);
+           });
+
+           const unsubOrders = onSnapshot(ordersRef, (snap) => {
+               const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+               setOrders(items);
+           });
+
+           return () => { unsubProd(); unsubOrders(); };
+       } else {
+           // Se não logado, tenta login anonimo (para clientes verem cardapio)
+           // Ou se for admin, espera login manual
+           signInAnonymously(auth).catch(e => console.log("Anon auth error", e));
+       }
     });
     return () => unsubscribeAuth();
-  }, [view]);
-
-  // 2. EFEITO PARA CARREGAR DADOS DO FIRESTORE
-  useEffect(() => {
-    const productsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'products');
-    const unsubProducts = onSnapshot(productsRef, (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setProducts(items);
-    }, (error) => console.error("Erro ao carregar produtos:", error));
-
-    const ordersRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders');
-    const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
-      let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setOrders(items);
-    }, (error) => console.error("Erro ao carregar pedidos:", error));
-
-    return () => {
-      unsubProducts();
-      unsubOrders();
-    };
   }, []);
 
-  // --- AÇÕES DO CARRINHO ---
+  // --- Ações do Carrinho ---
   const addToCart = (product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
-      if (existing) return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
+      }
       return [...prev, { ...product, qty: 1 }];
     });
     setIsCartOpen(true);
   };
 
   const updateQty = (id, delta) => {
-    setCart(prev => prev.map(item => item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item));
+    setCart(prev => prev.map(item => {
+      if (item.id === id) return { ...item, qty: Math.max(1, item.qty + delta) };
+      return item;
+    }));
   };
 
   const removeFromCart = (id) => setCart(prev => prev.filter(item => item.id !== id));
-  
+
   const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
 
-  // --- AÇÕES DE PEDIDO ---
+  // --- Ações de Checkout ---
   const placeOrderWhatsApp = async () => {
-    if (cart.length === 0) return;
     if (!checkoutForm.name || !checkoutForm.whatsapp || !checkoutForm.address) {
-      alert("Preencha os campos obrigatórios.");
+      alert("Por favor, preencha todos os campos obrigatórios (*)");
       return;
     }
 
-    try {
-      const orderData = {
-        customer: checkoutForm.name,
-        whatsapp: checkoutForm.whatsapp,
-        address: checkoutForm.address,
-        notes: checkoutForm.notes,
-        items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
-        total: cartTotal,
-        status: 'pendente',
-        createdAt: new Date().toISOString(),
-        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-      };
-
-      const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), orderData);
-
-      let message = `*NOVO PEDIDO #${docRef.id.slice(0, 4).toUpperCase()} - FAMILIA DAVANZO*\n\n`;
-      message += `*Cliente:* ${checkoutForm.name}\n`;
-      message += `*Endereço:* ${checkoutForm.address}\n`;
-      if(checkoutForm.notes) message += `*Obs:* ${checkoutForm.notes}\n`;
-      message += `--------------------------------\n`;
-      cart.forEach(item => {
-        message += `${item.qty}x ${item.name} - ${formatCurrency(item.price * item.qty)}\n`;
-      });
-      message += `--------------------------------\n`;
-      message += `*TOTAL: ${formatCurrency(cartTotal)}*\n`;
-      
-      const whatsappUrl = `https://wa.me/5511999999999?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
-
-      setCart([]);
-      setIsCartOpen(false);
-      setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '' });
-
-    } catch (err) {
-      console.error("Erro ao criar pedido:", err);
-      alert("Houve um erro ao processar o pedido. Tente novamente.");
-    }
-  };
-
-  // --- AÇÕES DE ADMIN (CRUD PRODUTOS) ---
-  const handleSaveProduct = async (e) => {
-    e.preventDefault();
-    const productData = {
-      name: editingProduct.name,
-      price: parseFloat(editingProduct.price),
-      category: editingProduct.category,
-      description: editingProduct.description,
-      image: editingProduct.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
+    const orderData = {
+      customer: checkoutForm.name,
+      whatsapp: checkoutForm.whatsapp,
+      address: checkoutForm.address,
+      notes: checkoutForm.notes,
+      items: cart,
+      total: cartTotal,
+      status: 'pendente',
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     try {
-      if (editingProduct.id) {
-        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', editingProduct.id);
-        await updateDoc(ref, productData);
-      } else {
-        await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'products'), productData);
-      }
-      setIsProductFormOpen(false);
-      setEditingProduct(null);
-    } catch (err) {
-      console.error("Erro ao salvar produto:", err);
-      alert("Erro ao salvar produto.");
+      // Salvar no Firestore
+      await addDoc(collection(db, 'orders'), orderData);
+      
+      // Gerar Link WhatsApp
+      const msg = `*Novo Pedido - Assados Davanzo*\n\n` +
+                  `Cliente: ${checkoutForm.name}\n` +
+                  `Endereço: ${checkoutForm.address}\n\n` +
+                  `*Itens:*\n` +
+                  cart.map(i => `${i.qty}x ${i.name} - ${formatCurrency(i.price)}`).join('\n') +
+                  `\n\n*Total: ${formatCurrency(cartTotal)}*\n` +
+                  (checkoutForm.notes ? `Obs: ${checkoutForm.notes}` : '');
+      
+      const whatsappUrl = `https://wa.me/55${checkoutForm.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`;
+      
+      setCart([]);
+      setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '' });
+      setIsCartOpen(false);
+      
+      // Abrir WhatsApp
+      window.open(whatsappUrl, '_blank');
+      
+      alert("Pedido realizado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao criar pedido", error);
+      alert("Erro ao enviar pedido.");
     }
+  };
+
+  // --- Ações Admin / Driver ---
+  const updateOrderStatus = async (orderId, newStatus) => {
+      try {
+          await updateDoc(doc(db, 'orders', orderId), {
+              status: newStatus,
+              updatedAt: new Date()
+          });
+      } catch (e) {
+          console.error("Erro ao atualizar status", e);
+      }
+  };
+
+  const handleSaveProduct = async (productData) => {
+      try {
+          if (editingProduct) {
+              await updateDoc(doc(db, 'products', editingProduct.id), productData);
+          } else {
+              await addDoc(collection(db, 'products'), productData);
+          }
+          setIsProductFormOpen(false);
+          setEditingProduct(null);
+      } catch (e) {
+          console.error("Erro ao salvar produto", e);
+      }
   };
 
   const handleDeleteProduct = async (id) => {
-    if (window.confirm("Excluir produto permanentemente?")) {
-      try {
-        await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', id));
-      } catch (err) {
-        console.error("Erro ao excluir:", err);
+      if (window.confirm("Tem certeza que deseja excluir este produto?")) {
+          try {
+              await deleteDoc(doc(db, 'products', id));
+          } catch (e) { console.error(e); }
       }
-    }
-  };
-
-  const updateOrderStatus = async (orderId, newStatus) => {
-    try {
-      const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId);
-      await updateDoc(ref, { status: newStatus });
-    } catch (err) {
-      console.error("Erro ao atualizar status:", err);
-    }
   };
 
   return (
-    <div className="font-sans text-gray-900">
+    <div>
       {view === 'landing' && <LandingPage setView={setView} setIsAdminMode={setIsAdminMode} setIsDriverMode={setIsDriverMode} />}
+      
       {view === 'customer' && <CustomerArea 
           products={products} cart={cart} addToCart={addToCart} updateQty={updateQty} 
           removeFromCart={removeFromCart} cartTotal={cartTotal} 
@@ -630,6 +758,7 @@ export default function FoodBusinessApp() {
           setIsCartOpen={setIsCartOpen} activeCategory={activeCategory} 
           setActiveCategory={setActiveCategory} setView={setView} 
       />}
+      
       {view === 'admin' && <AdminArea 
           user={user} auth={auth} isAdminMode={isAdminMode} setIsAdminMode={setIsAdminMode} 
           setView={setView} adminTab={adminTab} setAdminTab={setAdminTab} 
@@ -638,6 +767,7 @@ export default function FoodBusinessApp() {
           isProductFormOpen={isProductFormOpen} setIsProductFormOpen={setIsProductFormOpen}
           editingProduct={editingProduct} setEditingProduct={setEditingProduct}
       />}
+      
       {view === 'driver' && <DriverArea 
           user={user} auth={auth} isDriverMode={isDriverMode} setIsDriverMode={setIsDriverMode}
           setView={setView} orders={orders} driverTab={driverTab} setDriverTab={setDriverTab}
@@ -645,4 +775,4 @@ export default function FoodBusinessApp() {
       />}
     </div>
   );
-}
+};
