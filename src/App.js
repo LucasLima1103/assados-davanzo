@@ -379,7 +379,13 @@ const AdminApp = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setIsAuthenticated(!!currentUser);
+      // CORREÇÃO: Só autentica se o usuário existir E NÃO FOR ANÔNIMO
+      // Isso impede que o login automático do cliente libere o admin
+      if (currentUser && !currentUser.isAnonymous) {
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
     });
     return () => unsubscribe();
   }, []);
