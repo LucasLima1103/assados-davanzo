@@ -2,16 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
-  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut
+  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
-import { initializeApp } from 'firebase/app';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
   signInAnonymously, 
   onAuthStateChanged, 
+  createUserWithEmailAndPassword,
   signOut 
 } from 'firebase/auth';
 import { 
@@ -376,10 +377,12 @@ const AdminApp = () => {
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Estado para cadastro de Entregador
+  const [newDriver, setNewDriver] = useState({ email: '', pass: '' });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      // Verifica se é um usuário autenticado REAL (não anônimo)
       if (currentUser && !currentUser.isAnonymous) {
         setIsAuthenticated(true);
       } else {
@@ -433,6 +436,27 @@ const AdminApp = () => {
 
   const updateOrderStatus = async (id, status) => {
     await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status });
+  };
+
+  // --- Função para Cadastrar Entregador (Sem deslogar o Admin) ---
+  const handleRegisterDriver = async (e) => {
+    e.preventDefault();
+    if (!newDriver.email || !newDriver.pass) return alert("Preencha todos os campos.");
+    
+    // TRUQUE: Cria uma segunda instância do App Firebase para não deslogar o admin principal
+    const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+    const secondaryAuth = getAuth(secondaryApp);
+
+    try {
+      await createUserWithEmailAndPassword(secondaryAuth, newDriver.email, newDriver.pass);
+      alert(`Entregador ${newDriver.email} cadastrado com sucesso!`);
+      setNewDriver({ email: '', pass: '' });
+      await signOut(secondaryAuth); // Desloga da instância secundária
+      deleteApp(secondaryApp); // Limpa a instância
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao cadastrar: " + error.message);
+    }
   };
 
   if (!isAuthenticated) return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
@@ -525,28 +549,72 @@ const AdminApp = () => {
         {activeTab === 'driver' && (
           <div className="space-y-6 animate-in fade-in">
             <h1 className="text-2xl font-bold text-stone-800 font-serif">Gestão de Entregas</h1>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div><h3 className="font-bold text-stone-500 uppercase text-xs mb-4">Prontos para Entrega</h3>
-                <div className="space-y-4">
-                  {orders.filter(o => o.status === 'pronto').map(order => (
-                    <div key={order.id} className="bg-white p-4 rounded-lg border border-stone-200 shadow-sm flex flex-col gap-3">
-                      <div className="flex justify-between"><span className="font-bold text-lg">{order.customer}</span><span className="text-stone-400 text-xs">#{order.id.slice(0,4)}</span></div>
-                      <div className="flex items-start gap-2 text-sm text-stone-600 bg-stone-50 p-2 rounded"><MapPin size={16} className="mt-0.5 shrink-0"/> {order.address}</div>
-                      <button onClick={() => updateOrderStatus(order.id, 'em_entrega')} className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold shadow-sm transition-colors flex justify-center items-center gap-2"><Bike size={18}/> PEGAR PARA ENTREGA</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div><h3 className="font-bold text-stone-500 uppercase text-xs mb-4">Em Rota</h3>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* COLUNA 1: PEDIDOS EM ROTA (Com Entregador) */}
+              <div className="lg:col-span-2">
+                <h3 className="font-bold text-stone-500 uppercase text-xs mb-4 flex items-center gap-2"><Bike size={16}/> Entregas em Curso</h3>
                 <div className="space-y-4">
                   {orders.filter(o => o.status === 'em_entrega').map(order => (
                     <div key={order.id} className="bg-white p-4 rounded-lg border-l-4 border-purple-600 shadow-sm flex flex-col gap-3">
-                      <div className="flex justify-between"><span className="font-bold text-lg">{order.customer}</span><Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge></div>
-                      <div className="flex items-start gap-2 text-sm text-stone-600"><MapPin size={16} className="mt-0.5 shrink-0"/> {order.address}</div>
-                      <div className="grid grid-cols-2 gap-2"><button className="py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded font-bold text-xs">ABRIR MAPA</button><button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-xs flex justify-center items-center gap-1"><CheckCircle size={14}/> FINALIZAR</button></div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                           <span className="font-bold text-lg block">{order.customer}</span>
+                           <span className="text-xs text-stone-400 font-mono">#{order.id.slice(0,4)}</span>
+                        </div>
+                        <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
+                      </div>
+                      
+                      <div className="bg-stone-50 p-3 rounded text-sm text-stone-600">
+                        <div className="flex items-center gap-2 mb-1"><MapPin size={16} className="shrink-0 text-stone-400"/> {order.address}</div>
+                        {order.driverEmail && (
+                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-stone-200 text-purple-700 font-bold">
+                              <Users size={16}/> Entregador: {order.driverEmail}
+                           </div>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                         <button className="py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded font-bold text-xs">VER MAPA</button>
+                         <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-xs flex justify-center items-center gap-1"><CheckCircle size={14}/> FINALIZAR</button>
+                      </div>
                     </div>
                   ))}
+                  {orders.filter(o => o.status === 'em_entrega').length === 0 && <p className="text-stone-400 text-sm italic">Nenhuma entrega em andamento.</p>}
                 </div>
+              </div>
+
+              {/* COLUNA 2: CADASTRAR ENTREGADOR */}
+              <div>
+                 <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200 sticky top-4">
+                    <h3 className="font-bold text-stone-800 uppercase text-sm mb-4 flex items-center gap-2"><UserPlus size={18} className="text-orange-600"/> Novo Entregador</h3>
+                    <form onSubmit={handleRegisterDriver} className="space-y-4">
+                       <div>
+                          <label className="block text-xs font-bold text-stone-500 uppercase mb-1">E-mail de Acesso</label>
+                          <input 
+                            type="email" 
+                            className="w-full p-2 border border-stone-300 rounded text-sm" 
+                            placeholder="motoboy@davanzo.com"
+                            value={newDriver.email}
+                            onChange={e => setNewDriver({...newDriver, email: e.target.value})}
+                          />
+                       </div>
+                       <div>
+                          <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Senha Provisória</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-2 border border-stone-300 rounded text-sm" 
+                            placeholder="Mínimo 6 caracteres"
+                            value={newDriver.pass}
+                            onChange={e => setNewDriver({...newDriver, pass: e.target.value})}
+                          />
+                       </div>
+                       <button type="submit" className="w-full py-2 bg-stone-800 text-white font-bold rounded text-sm hover:bg-stone-900">CADASTRAR</button>
+                    </form>
+                    <p className="mt-4 text-xs text-stone-400 leading-relaxed border-t pt-3">
+                       * O entregador usará este e-mail e senha para acessar o painel de entregas.
+                    </p>
+                 </div>
               </div>
             </div>
           </div>
@@ -556,7 +624,7 @@ const AdminApp = () => {
       {isProductFormOpen && editingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsProductFormOpen(false)} />
-          <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto m-4">
               <h3 className="font-bold text-lg uppercase text-stone-800 border-b pb-2">{editingProduct.id ? 'Editar' : 'Novo'} Produto</h3>
               <div className="space-y-4">
                 <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Nome</label><input className="w-full p-2 border border-stone-300 rounded" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} /></div>
@@ -584,13 +652,15 @@ const AdminApp = () => {
 
 const DriverApp = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [orders, setOrders] = useState([]);
 
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      // Entregador também precisa ser usuário real
+      // Entregador também precisa ser usuário real (e-mail/senha)
       if (currentUser && !currentUser.isAnonymous) {
+        setUser(currentUser);
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);
@@ -610,8 +680,8 @@ const DriverApp = () => {
     return () => unsubOrders();
   }, [isAuthenticated]);
 
-  const updateOrderStatus = async (id, status) => {
-    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status });
+  const updateOrderStatus = async (id, status, extraData = {}) => {
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status, ...extraData });
   };
 
   if (!isAuthenticated) return <LoginScreen title="Área do Entregador" onLogin={() => setIsAuthenticated(true)} />;
@@ -620,7 +690,10 @@ const DriverApp = () => {
     <div className="min-h-screen bg-stone-100 font-sans pb-20">
       <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-lg">
         <h2 className="font-bold text-lg flex gap-2 items-center"><Bike className="text-green-500" /> Entregas</h2>
-        <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20} /></button>
+        <div className="flex items-center gap-3">
+           <span className="text-xs text-stone-400 hidden sm:inline">{user?.email}</span>
+           <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20} /></button>
+        </div>
       </header>
 
       <main className="p-4 space-y-6">
@@ -638,7 +711,8 @@ const DriverApp = () => {
                 <div className="flex items-center gap-2 text-stone-600 text-sm mb-4 bg-stone-50 p-2 rounded">
                   <MapPin size={16} className="shrink-0"/> {order.address}
                 </div>
-                <button onClick={() => updateOrderStatus(order.id, 'em_entrega')} className="w-full py-3 bg-stone-900 text-white font-bold rounded shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                {/* Ao clicar, salva o email do entregador no pedido */}
+                <button onClick={() => updateOrderStatus(order.id, 'em_entrega', { driverEmail: user.email })} className="w-full py-3 bg-stone-900 text-white font-bold rounded shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
                   <Bike size={20}/> INICIAR ROTA
                 </button>
               </div>
@@ -653,7 +727,8 @@ const DriverApp = () => {
         <div>
           <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-purple-500">Minhas Entregas em Curso</h3>
           <div className="space-y-3">
-            {orders.filter(o => o.status === 'em_entrega').map(order => (
+            {/* Filtra apenas os pedidos que estão em entrega E que foram pegos por ESTE usuário */}
+            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).map(order => (
               <div key={order.id} className="bg-white p-4 rounded-md shadow-md border-l-4 border-purple-600 animate-in zoom-in duration-300">
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-bold text-xl">{order.customer}</span>
@@ -670,7 +745,7 @@ const DriverApp = () => {
                 </div>
               </div>
             ))}
-            {orders.filter(o => o.status === 'em_entrega').length === 0 && (
+            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).length === 0 && (
               <p className="text-center text-stone-400 text-sm py-4 italic">Você não tem entregas ativas.</p>
             )}
           </div>
