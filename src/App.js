@@ -26,7 +26,6 @@ import {
 } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
-// Configuração direta para evitar erros de "variável não definida" no Vercel
 const firebaseConfig = {
   apiKey: "AIzaSyC47npvRo_nBky0R6J-27eMc4h4KZLAjqw",
   authDomain: "assados-familia-davanzo.firebaseapp.com",
@@ -62,7 +61,7 @@ const getStatusColor = (status) => {
   }
 };
 
-// --- COMPONENTES (DEFINIDOS FORA DA APP PRINCIPAL PARA EVITAR RE-RENDER BUG) ---
+// --- COMPONENTES ---
 
 const LoginScreen = ({ role, onLogin, onBack }) => {
   const [email, setEmail] = useState('');
@@ -265,7 +264,7 @@ const CustomerArea = ({
 };
 
 const AdminArea = ({ 
-  user, auth, isAdminMode, setIsAdminMode, setView, 
+  auth, isAdminMode, setIsAdminMode, setView, 
   adminTab, setAdminTab, orders, products, 
   updateOrderStatus, handleSaveProduct, handleDeleteProduct,
   isProductFormOpen, setIsProductFormOpen, editingProduct, setEditingProduct
@@ -470,8 +469,8 @@ const AdminArea = ({
 };
 
 const DriverArea = ({ 
-  user, auth, isDriverMode, setIsDriverMode, setView, 
-  orders, driverTab, setDriverTab, updateOrderStatus 
+  auth, isDriverMode, setIsDriverMode, setView, 
+  orders, updateOrderStatus 
 }) => {
     if (!isDriverMode) {
         return (
@@ -582,7 +581,7 @@ const DriverArea = ({
 };
 
 // --- APP PRINCIPAL ---
-const App = () => {
+export default function App() {
   // Estado Global
   const [view, setView] = useState('landing'); // landing, customer, admin, driver
   const [user, setUser] = useState(null);
@@ -601,7 +600,6 @@ const App = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isDriverMode, setIsDriverMode] = useState(false);
   const [adminTab, setAdminTab] = useState('dashboard');
-  const [driverTab, setDriverTab] = useState('active');
   
   // Estado Admin
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
@@ -756,7 +754,7 @@ const App = () => {
       />}
       
       {view === 'admin' && <AdminArea 
-          user={user} auth={auth} isAdminMode={isAdminMode} setIsAdminMode={setIsAdminMode} 
+          auth={auth} isAdminMode={isAdminMode} setIsAdminMode={setIsAdminMode} 
           setView={setView} adminTab={adminTab} setAdminTab={setAdminTab} 
           orders={orders} products={products} updateOrderStatus={updateOrderStatus} 
           handleSaveProduct={handleSaveProduct} handleDeleteProduct={handleDeleteProduct}
@@ -765,12 +763,10 @@ const App = () => {
       />}
       
       {view === 'driver' && <DriverArea 
-          user={user} auth={auth} isDriverMode={isDriverMode} setIsDriverMode={setIsDriverMode}
-          setView={setView} orders={orders} driverTab={driverTab} setDriverTab={setDriverTab}
+          auth={auth} isDriverMode={isDriverMode} setIsDriverMode={setIsDriverMode}
+          setView={setView} orders={orders} 
           updateOrderStatus={updateOrderStatus}
       />}
     </div>
   );
 };
-
-export default App;
