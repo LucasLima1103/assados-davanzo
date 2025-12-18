@@ -472,7 +472,7 @@ const AdminArea = ({
            <div className="space-y-6">
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-stone-800 font-serif">Cardápio</h2>
-               <button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados'}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-sm font-bold text-sm">NOVO ITEM</button>
+               <button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: ''}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-sm font-bold text-sm">NOVO ITEM</button>
              </div>
              <div className="bg-white rounded-sm shadow-sm border border-stone-200">
                <table className="w-full text-left">
@@ -506,8 +506,16 @@ const AdminArea = ({
                {/* --- ÁREA DE UPLOAD DE IMAGEM --- */}
                <div className="border border-stone-300 p-4 rounded-sm bg-stone-50">
                   <label className="block text-xs font-bold text-stone-500 uppercase mb-2">Imagem do Produto</label>
+                  
+                  {/* PREVIEW DA IMAGEM ADICIONADO AQUI */}
+                  {editingProduct.image && (
+                    <div className="mb-3 rounded-sm overflow-hidden border border-stone-200 bg-white h-48 w-full flex items-center justify-center">
+                       <img src={editingProduct.image} alt="Preview" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+
                   <div className="flex gap-2 mb-2">
-                    <input className="w-full p-2 border border-stone-300 bg-white" placeholder="URL da imagem (ou envie foto abaixo)" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
+                    <input className="w-full p-2 border border-stone-300 bg-white text-xs text-stone-500" placeholder="URL da imagem (ou envie foto abaixo)" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                   </div>
                   <div className="relative">
                     <input 
