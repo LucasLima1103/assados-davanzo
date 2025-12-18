@@ -227,7 +227,7 @@ const CustomerArea = ({
                 <div className="space-y-6">
                   {cart.map(item => (
                     <div key={item.id} className="flex gap-4 p-4 bg-white border border-stone-200 rounded-sm">
-                       <div className="flex-1">
+                        <div className="flex-1">
                           <h4 className="font-bold text-stone-800 font-serif">{item.name}</h4>
                           <p className="text-orange-800 font-bold text-sm">{formatCurrency(item.price)}</p>
                           <div className="flex items-center gap-4 mt-2">
@@ -235,8 +235,8 @@ const CustomerArea = ({
                             <span className="text-sm font-bold">{item.qty}</span>
                             <button onClick={() => updateQty(item.id, 1)} className="p-1 hover:bg-stone-100"><Plus size={14}/></button>
                           </div>
-                       </div>
-                       <button onClick={() => removeFromCart(item.id)} className="text-stone-300 hover:text-red-600 self-start"><Trash2 size={18}/></button>
+                        </div>
+                        <button onClick={() => removeFromCart(item.id)} className="text-stone-300 hover:text-red-600 self-start"><Trash2 size={18}/></button>
                     </div>
                   ))}
                   <div className="bg-white p-4 rounded-sm space-y-3 border border-stone-200">
@@ -244,6 +244,23 @@ const CustomerArea = ({
                     <input type="text" placeholder="Seu Nome *" className="w-full p-2 border border-stone-200 rounded-sm" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} />
                     <input type="tel" placeholder="WhatsApp *" className="w-full p-2 border border-stone-200 rounded-sm" value={checkoutForm.whatsapp} onChange={e => setCheckoutForm({...checkoutForm, whatsapp: e.target.value})} />
                     <textarea placeholder="Endereço *" className="w-full p-2 border border-stone-200 rounded-sm h-20 resize-none" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} />
+                    
+                    {/* --- NOVO CAMPO DE PAGAMENTO --- */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-stone-500 uppercase">Forma de Pagamento</label>
+                      <select 
+                        className="w-full p-2 border border-stone-200 rounded-sm bg-white"
+                        value={checkoutForm.paymentMethod}
+                        onChange={e => setCheckoutForm({...checkoutForm, paymentMethod: e.target.value})}
+                      >
+                        <option value="Pix">Pix</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        <option value="Cartão de Débito">Cartão de Débito</option>
+                      </select>
+                    </div>
+                    {/* ------------------------------- */}
+
                     <textarea placeholder="Obs" className="w-full p-2 border border-stone-200 rounded-sm h-16 resize-none" value={checkoutForm.notes} onChange={e => setCheckoutForm({...checkoutForm, notes: e.target.value})} />
                   </div>
                 </div>
@@ -298,7 +315,7 @@ const AdminArea = ({
           <button onClick={() => setAdminTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'menu' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><Menu size={20}/> Cardápio</button>
         </nav>
         <div className="p-4 border-t border-stone-800">
-           <button onClick={() => { signOut(auth); setView('landing'); setIsAdminMode(false); }} className="text-stone-500 hover:text-white flex gap-2"><ArrowRight className="rotate-180"/> Sair</button>
+            <button onClick={() => { signOut(auth); setView('landing'); setIsAdminMode(false); }} className="text-stone-500 hover:text-white flex gap-2"><ArrowRight className="rotate-180"/> Sair</button>
         </div>
       </aside>
 
@@ -332,6 +349,11 @@ const AdminArea = ({
                   <div className="p-4 flex-1">
                     <h4 className="font-bold text-lg font-serif">{order.customer}</h4>
                     <p className="text-xs text-stone-500 mb-2">{order.address}</p>
+                    {order.paymentMethod && (
+                      <div className="text-xs font-bold text-stone-700 mb-2 bg-gray-100 p-1 inline-block rounded">
+                        Pagamento: {order.paymentMethod}
+                      </div>
+                    )}
                     <ul className="bg-yellow-50 p-3 rounded-sm text-sm space-y-1">
                       {order.items?.map((i, idx) => <li key={idx}><b>{i.qty}x</b> {i.name}</li>)}
                     </ul>
@@ -401,8 +423,8 @@ const AdminArea = ({
   );
 };
 
-const DriverArea = ({
-  user, auth, isDriverMode, setIsDriverMode, setView,
+const DriverArea = ({ 
+  user, auth, isDriverMode, setIsDriverMode, setView, 
   orders, driverTab, setDriverTab, updateOrderStatus
 }) => {
   if (!isDriverMode) {
@@ -421,31 +443,31 @@ const DriverArea = ({
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col font-sans">
       <header className="bg-stone-900 text-white shadow-lg sticky top-0 z-10 p-4 flex justify-between">
-         <h2 className="font-bold text-lg flex gap-2"><Bike className="text-green-500" /> Área do Entregador</h2>
-         <button onClick={() => { signOut(auth); setView('landing'); setIsDriverMode(false); }}>SAIR</button>
+          <h2 className="font-bold text-lg flex gap-2"><Bike className="text-green-500" /> Área do Entregador</h2>
+          <button onClick={() => { signOut(auth); setView('landing'); setIsDriverMode(false); }}>SAIR</button>
       </header>
       <div className="bg-stone-800 grid grid-cols-2">
-         <button onClick={() => setDriverTab('available')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'available' ? 'bg-stone-700 text-white border-b-4 border-white' : 'text-stone-400'}`}>Disponíveis ({availableOrders.length})</button>
-         <button onClick={() => setDriverTab('active')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'active' ? 'bg-stone-700 text-white border-b-4 border-purple-500' : 'text-stone-400'}`}>Em Rota ({myDeliveries.length})</button>
+          <button onClick={() => setDriverTab('available')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'available' ? 'bg-stone-700 text-white border-b-4 border-white' : 'text-stone-400'}`}>Disponíveis ({availableOrders.length})</button>
+          <button onClick={() => setDriverTab('active')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'active' ? 'bg-stone-700 text-white border-b-4 border-purple-500' : 'text-stone-400'}`}>Em Rota ({myDeliveries.length})</button>
       </div>
       <main className="p-4 space-y-4">
-         {driverTab === 'available' && availableOrders.map(o => (
-           <div key={o.id} className="bg-white p-5 rounded-sm border border-stone-200">
-             <h3 className="font-bold text-lg">{o.customer}</h3>
-             <p className="text-stone-500 text-sm mb-3">{o.address}</p>
-             <button onClick={() => updateOrderStatus(o.id, 'em_entrega')} className="w-full py-3 bg-green-700 text-white font-bold rounded-sm">ACEITAR</button>
-           </div>
-         ))}
-         {driverTab === 'active' && myDeliveries.map(o => (
-           <div key={o.id} className="bg-white p-5 rounded-sm border-l-4 border-purple-600 shadow-md">
-             <h3 className="font-bold text-lg">{o.customer}</h3>
-             <p className="text-stone-800 text-sm mb-3 font-bold">{o.address}</p>
-             <div className="grid grid-cols-2 gap-2">
-               <button className="py-2 bg-stone-100 font-bold text-xs">MAPS</button>
-               <button onClick={() => updateOrderStatus(o.id, 'entregue')} className="py-2 bg-stone-800 text-white font-bold text-xs">ENTREGUE</button>
-             </div>
-           </div>
-         ))}
+          {driverTab === 'available' && availableOrders.map(o => (
+            <div key={o.id} className="bg-white p-5 rounded-sm border border-stone-200">
+              <h3 className="font-bold text-lg">{o.customer}</h3>
+              <p className="text-stone-500 text-sm mb-3">{o.address}</p>
+              <button onClick={() => updateOrderStatus(o.id, 'em_entrega')} className="w-full py-3 bg-green-700 text-white font-bold rounded-sm">ACEITAR</button>
+            </div>
+          ))}
+          {driverTab === 'active' && myDeliveries.map(o => (
+            <div key={o.id} className="bg-white p-5 rounded-sm border-l-4 border-purple-600 shadow-md">
+              <h3 className="font-bold text-lg">{o.customer}</h3>
+              <p className="text-stone-800 text-sm mb-3 font-bold">{o.address}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="py-2 bg-stone-100 font-bold text-xs">MAPS</button>
+                <button onClick={() => updateOrderStatus(o.id, 'entregue')} className="py-2 bg-stone-800 text-white font-bold text-xs">ENTREGUE</button>
+              </div>
+            </div>
+          ))}
       </main>
     </div>
   );
@@ -472,8 +494,14 @@ export default function FoodBusinessApp() {
   // Estados Driver
   const [driverTab, setDriverTab] = useState('available');
 
-  // Estado Checkout
-  const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '' });
+  // Estado Checkout - AGORA COM PAYMENTMETHOD
+  const [checkoutForm, setCheckoutForm] = useState({ 
+    name: '', 
+    whatsapp: '', 
+    address: '', 
+    notes: '',
+    paymentMethod: 'Pix' // Default
+  });
 
   // 1. EFEITO DE INICIALIZAÇÃO E AUTH
   useEffect(() => {
@@ -541,6 +569,7 @@ export default function FoodBusinessApp() {
         whatsapp: checkoutForm.whatsapp,
         address: checkoutForm.address,
         notes: checkoutForm.notes,
+        paymentMethod: checkoutForm.paymentMethod, // SALVA O MÉTODO DE PAGAMENTO
         items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
         total: cartTotal,
         status: 'pendente',
@@ -553,6 +582,7 @@ export default function FoodBusinessApp() {
       let message = `*NOVO PEDIDO #${docRef.id.slice(0, 4).toUpperCase()} - FAMILIA DAVANZO*\n\n`;
       message += `*Cliente:* ${checkoutForm.name}\n`;
       message += `*Endereço:* ${checkoutForm.address}\n`;
+      message += `*Pagamento:* ${checkoutForm.paymentMethod}\n`; // MOSTRA NO WHATS
       if(checkoutForm.notes) message += `*Obs:* ${checkoutForm.notes}\n`;
       message += `--------------------------------\n`;
       cart.forEach(item => {
@@ -566,7 +596,7 @@ export default function FoodBusinessApp() {
 
       setCart([]);
       setIsCartOpen(false);
-      setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '' });
+      setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '', paymentMethod: 'Pix' });
 
     } catch (err) {
       console.error("Erro ao criar pedido:", err);
