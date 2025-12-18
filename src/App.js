@@ -3,14 +3,14 @@ import {
   ShoppingBag, ChefHat, UtensilsCrossed, Plus, Minus, Trash2, CheckCircle, 
   Clock, DollarSign, LayoutDashboard, Package, Menu, X, ArrowRight, 
   TrendingUp, Bike, MapPin, Navigation, CheckSquare, Lock, Phone, Send, 
-  Save, Edit, Image as ImageIcon, LogOut, Loader
+  Save, Edit, Image as ImageIcon 
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInWithCustomToken,
+  signInWithEmailAndPassword, 
   signInAnonymously, 
   onAuthStateChanged, 
   signOut 
@@ -22,20 +22,38 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot,
-  query,
-  orderBy
+  onSnapshot 
 } from 'firebase/firestore';
 
-// --- CONFIGURAÇÃO DO FIREBASE (AMBIENTE) ---
-const firebaseConfig = JSON.parse(__firebase_config);
+// --- CONFIGURAÇÃO DO FIREBASE ---
+// 🔴 🔴 🔴 SUBSTITUA COM SUAS CHAVES AQUI SE NECESSÁRIO 🔴 🔴 🔴
+const manualConfig = {
+  apiKey: "AIzaSyC47npvRo_nBky0R6J-27eMc4h4KZLAjqw",
+  authDomain: "assados-familia-davanzo.firebaseapp.com",
+  projectId: "assados-familia-davanzo",
+  storageBucket: "assados-familia-davanzo.firebasestorage.app",
+  messagingSenderId: "741832503182",
+  appId: "1:741832503182:web:eb89a26336423c58967edf",
+  measurementId: "G-Q240S9258G"
+};
+
+// Inicialização segura
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- UTILITÁRIOS ---
+// ID do App para separar dados
+const APP_ID = 'assados-davanzo-prod'; 
+
+// --- FUNÇÕES AUXILIARES ---
 const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const Badge = ({ children, color }) => (
+  <span className={`px-2 py-1 rounded-full text-xs font-bold ${color}`}>
+    {children}
+  </span>
+);
 
 const getStatusColor = (status) => {
   switch(status) {
@@ -43,42 +61,31 @@ const getStatusColor = (status) => {
     case 'preparando': return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'pronto': return 'bg-green-100 text-green-800 border-green-200';
     case 'em_entrega': return 'bg-purple-100 text-purple-800 border-purple-200';
-    case 'entregue': return 'bg-stone-200 text-stone-600 line-through border-stone-300';
-    default: return 'bg-stone-100 text-stone-800';
+    case 'entregue': return 'bg-gray-200 text-gray-600 line-through border-gray-300';
+    default: return 'bg-gray-100 text-gray-800';
   }
 };
 
-const Badge = ({ children, color }) => (
-  <span className={`px-2 py-1 rounded-sm text-xs font-bold uppercase tracking-wider border ${color}`}>
-    {children}
-  </span>
-);
+// --- COMPONENTES (DEFINIDOS FORA DA APP PRINCIPAL PARA EVITAR RE-RENDER BUG) ---
 
-// --- COMPONENTES AUXILIARES ---
-
-// Tela de Login Simulado (para não conflitar com Auth do ambiente)
 const LoginScreen = ({ role, onLogin, onBack }) => {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    signOut(auth).catch(() => {});
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    // Login Simulado para Demonstração
-    if (role === 'admin') {
-      if (email === 'admin@davanzo.com' && pass === 'admin') {
-        onLogin();
-      } else {
-        setError('Credenciais inválidas. Tente admin@davanzo.com / admin');
-      }
-    } else if (role === 'driver') {
-      if (email === 'driver@davanzo.com' && pass === 'driver') {
-        onLogin();
-      } else {
-        setError('Credenciais inválidas. Tente driver@davanzo.com / driver');
-      }
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      onLogin(); 
+    } catch (err) {
+      console.error(err);
+      setError('Erro ao entrar. Verifique e-mail e senha.');
     }
   };
 
@@ -110,7 +117,7 @@ const LoginScreen = ({ role, onLogin, onBack }) => {
               value={pass}
               onChange={(e) => setPass(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-sm focus:ring-2 focus:ring-orange-800 outline-none"
-              placeholder="Use 'admin' ou 'driver'"
+              placeholder="******"
             />
           </div>
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
@@ -127,40 +134,26 @@ const LoginScreen = ({ role, onLogin, onBack }) => {
 };
 
 const LandingPage = ({ setView, setIsAdminMode, setIsDriverMode }) => (
-  <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white text-center font-serif relative overflow-hidden">
-    {/* Background Pattern */}
-    <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #fb923c 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
-    
-    <div className="mb-8 p-8 bg-orange-800 rounded-full shadow-2xl border-4 border-orange-200 z-10">
+  <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white text-center font-serif">
+    <div className="mb-8 p-8 bg-orange-800 rounded-full shadow-2xl border-4 border-orange-200">
       <ChefHat size={80} className="text-white" />
     </div>
-    <h1 className="text-4xl md:text-6xl font-bold mb-2 tracking-wide text-orange-100 z-10">Assados</h1>
-    <h2 className="text-3xl md:text-5xl font-light mb-6 text-orange-200 italic z-10">Familia Davanzo</h2>
-    <div className="h-1 w-24 bg-orange-500 mb-12 rounded-full z-10"></div>
+    <h1 className="text-4xl md:text-6xl font-bold mb-2 tracking-wide text-orange-100">Assados</h1>
+    <h2 className="text-3xl md:text-5xl font-light mb-6 text-orange-200 italic">Familia Davanzo</h2>
+    <div className="h-1 w-24 bg-orange-500 mb-8 rounded-full"></div>
     
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl font-sans z-10">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl font-sans">
       <button onClick={() => setView('customer')} className="group relative flex flex-col items-center p-8 bg-white text-gray-800 rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border-b-4 border-orange-800">
-        <div className="bg-orange-100 p-4 rounded-full mb-4 group-hover:bg-orange-200 transition-colors">
-          <ShoppingBag size={32} className="text-orange-800" />
-        </div>
+        <ShoppingBag size={40} className="mb-4 text-orange-800 group-hover:scale-110 transition-transform" />
         <span className="text-xl font-bold uppercase tracking-wider">Cardápio</span>
-        <span className="text-xs text-stone-500 mt-2">Faça seu pedido</span>
       </button>
-
       <button onClick={() => { setIsAdminMode(false); setView('admin'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
-        <div className="bg-stone-700 p-4 rounded-full mb-4 group-hover:bg-stone-600 transition-colors">
-          <LayoutDashboard size={32} className="text-stone-300" />
-        </div>
+        <LayoutDashboard size={40} className="mb-4 text-stone-400 group-hover:scale-110 transition-transform" />
         <span className="text-xl font-bold uppercase tracking-wider">Gestão</span>
-        <span className="text-xs text-stone-500 mt-2">Área Restrita</span>
       </button>
-
       <button onClick={() => { setIsDriverMode(false); setView('driver'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
-        <div className="bg-stone-700 p-4 rounded-full mb-4 group-hover:bg-stone-600 transition-colors">
-          <Bike size={32} className="text-stone-300" />
-        </div>
+        <Bike size={40} className="mb-4 text-stone-400 group-hover:scale-110 transition-transform" />
         <span className="text-xl font-bold uppercase tracking-wider">Entregas</span>
-        <span className="text-xs text-stone-500 mt-2">Área Restrita</span>
       </button>
     </div>
   </div>
@@ -176,169 +169,90 @@ const CustomerArea = ({
 
   return (
     <div className="min-h-screen bg-stone-50 pb-20 font-sans">
-      <header className="bg-white sticky top-0 z-20 shadow-md border-b-4 border-orange-800">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <button onClick={() => setView('landing')} className="flex items-center text-stone-600 hover:text-orange-800 transition-colors">
-            <ArrowRight className="rotate-180 mr-2" size={20} /> <span className="hidden sm:inline">Início</span>
+      <header className="bg-white sticky top-0 z-10 shadow-md border-b-4 border-orange-800">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+          <button onClick={() => setView('landing')} className="flex items-center text-stone-600 hover:text-orange-800">
+            <ArrowRight className="rotate-180 mr-2" size={20} /> Início
           </button>
           <div className="flex flex-col items-center">
-            <h1 className="text-xl font-bold text-gray-900 font-serif tracking-tight">Familia Davanzo</h1>
+            <h1 className="text-lg font-bold text-gray-900 font-serif">Familia Davanzo</h1>
           </div>
-          <button onClick={() => setIsCartOpen(true)} className="relative p-2 hover:bg-stone-100 rounded-full transition-colors">
-            <ShoppingBag className="text-stone-800" size={26} />
-            {cart.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-orange-800 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
-                {cart.reduce((a, b) => a + b.qty, 0)}
-              </span>
-            )}
+          <button onClick={() => setIsCartOpen(true)} className="relative p-2">
+            <ShoppingBag className="text-stone-700" size={28} />
+            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-orange-800 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">{cart.reduce((a, b) => a + b.qty, 0)}</span>}
           </button>
         </div>
-        
-        {/* Categorias com scroll horizontal */}
-        <div className="max-w-6xl mx-auto px-4 pb-0 overflow-x-auto bg-white scrollbar-hide">
-          <div className="flex space-x-2 py-3 min-w-max">
+        <div className="max-w-5xl mx-auto px-4 pb-4 overflow-x-auto bg-stone-100 pt-2">
+          <div className="flex space-x-2 justify-center min-w-max mx-auto">
             {categories.map(cat => (
-              <button 
-                key={cat} 
-                onClick={() => setActiveCategory(cat)} 
-                className={`
-                  px-5 py-2 rounded-full text-sm font-bold uppercase tracking-wide transition-all
-                  ${activeCategory === cat 
-                    ? 'bg-orange-800 text-white shadow-md transform scale-105' 
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}
-                `}
-              >
-                {cat}
-              </button>
+              <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-6 py-2 rounded-sm text-sm font-bold uppercase ${activeCategory === cat ? 'bg-orange-800 text-white' : 'bg-white text-stone-600'}`}>{cat}</button>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {products.length === 0 ? (
-          <div className="text-center py-20">
-            <Loader className="animate-spin mx-auto text-orange-800 mb-4" size={40} />
-            <p className="text-stone-400 font-serif text-lg">Preparando o cardápio...</p>
-          </div>
-        ) : null}
-        
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        {products.length === 0 ? <p className="text-center text-stone-400 mt-10">Carregando cardápio...</p> : null}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map(product => (
-            <div key={product.id} className="bg-white rounded-sm shadow-sm border border-stone-200 overflow-hidden flex flex-col group hover:shadow-xl transition-shadow duration-300">
-              <div className="h-56 w-full relative overflow-hidden bg-stone-200">
-                {product.image ? (
-                   <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                ) : (
-                   <div className="w-full h-full flex items-center justify-center text-stone-400">
-                     <ImageIcon size={48} />
-                   </div>
-                )}
-                {/* Etiqueta de Preço Flutuante */}
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-sm shadow-sm font-bold text-orange-900 border border-orange-100">
-                    {formatCurrency(product.price)}
-                </div>
+            <div key={product.id} className="bg-white rounded-sm shadow-sm border border-stone-200 overflow-hidden flex flex-col group">
+              <div className="h-48 w-full relative overflow-hidden bg-stone-100">
+                <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
               </div>
               <div className="p-6 flex-1 flex flex-col">
-                <h3 className="font-bold text-stone-800 text-xl font-serif mb-2">{product.name}</h3>
-                <p className="text-stone-500 text-sm mb-6 flex-1 leading-relaxed">{product.description}</p>
-                <button 
-                  onClick={() => addToCart(product)} 
-                  className="w-full py-3 bg-stone-800 text-white rounded-sm font-bold text-sm hover:bg-orange-800 active:bg-orange-900 transition-colors flex items-center justify-center gap-2 uppercase tracking-wider"
-                >
-                  <Plus size={18} /> Adicionar ao Pedido
-                </button>
+                <h3 className="font-bold text-stone-800 text-lg font-serif">{product.name}</h3>
+                <p className="text-stone-500 text-sm mb-4 flex-1 italic">{product.description}</p>
+                <div className="flex items-center justify-between mt-auto">
+                  <span className="font-bold text-xl text-orange-900">{formatCurrency(product.price)}</span>
+                  <button onClick={() => addToCart(product)} className="px-4 py-2 bg-stone-800 text-white rounded-sm font-bold text-sm hover:bg-orange-800 flex items-center gap-2">
+                    <Plus size={16} /> ADICIONAR
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       </main>
 
-      {/* Cart Sidebar */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsCartOpen(false)} />
-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l-4 border-orange-800 animate-slide-in-right">
-            <div className="p-5 border-b flex justify-between items-center bg-stone-50">
-              <div className="flex items-center gap-2">
-                <ShoppingBag className="text-orange-800" size={24} />
-                <h2 className="text-xl font-bold font-serif text-stone-800">Seu Pedido</h2>
-              </div>
-              <button onClick={() => setIsCartOpen(false)} className="hover:bg-stone-200 p-1 rounded transition"><X size={24} /></button>
+          <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsCartOpen(false)} />
+          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l-4 border-orange-800">
+            <div className="p-6 border-b flex justify-between items-center bg-stone-50">
+              <h2 className="text-xl font-bold font-serif text-stone-800">Seu Pedido</h2>
+              <button onClick={() => setIsCartOpen(false)}><X size={24} /></button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-5 bg-stone-50">
-              {cart.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-stone-400 space-y-4">
-                  <ShoppingBag size={64} className="opacity-20" />
-                  <p>Seu carrinho está vazio.</p>
-                  <button onClick={() => setIsCartOpen(false)} className="text-orange-800 font-bold hover:underline">Ver Cardápio</button>
-                </div>
-              ) : (
+            <div className="flex-1 overflow-y-auto p-6 bg-stone-50">
+              {cart.length === 0 ? <p className="text-center py-10 text-stone-400">Carrinho vazio.</p> : (
                 <div className="space-y-6">
-                  <div className="space-y-3">
-                    {cart.map(item => (
-                      <div key={item.id} className="flex gap-4 p-4 bg-white border border-stone-200 rounded-sm shadow-sm relative">
-                         <div className="flex-1">
-                            <h4 className="font-bold text-stone-800 font-serif text-lg">{item.name}</h4>
-                            <p className="text-orange-800 font-bold text-sm">{formatCurrency(item.price)}</p>
-                            <div className="flex items-center gap-3 mt-3 bg-stone-100 w-max rounded-sm p-1">
-                              <button onClick={() => updateQty(item.id, -1)} className="p-1 hover:bg-white rounded shadow-sm transition"><Minus size={14}/></button>
-                              <span className="text-sm font-bold w-6 text-center">{item.qty}</span>
-                              <button onClick={() => updateQty(item.id, 1)} className="p-1 hover:bg-white rounded shadow-sm transition"><Plus size={14}/></button>
-                            </div>
-                         </div>
-                         <button onClick={() => removeFromCart(item.id)} className="absolute top-4 right-4 text-stone-300 hover:text-red-500 transition"><Trash2 size={18}/></button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="bg-white p-5 rounded-sm space-y-4 border border-stone-200 shadow-sm">
-                    <h3 className="font-bold text-sm uppercase text-stone-500 border-b pb-2">Informações de Entrega</h3>
-                    <div className="space-y-3">
-                      <input 
-                        type="text" 
-                        placeholder="Seu Nome *" 
-                        className="w-full p-3 border border-stone-200 rounded-sm bg-stone-50 focus:ring-1 focus:ring-orange-800 focus:border-orange-800 outline-none transition" 
-                        value={checkoutForm.name} 
-                        onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} 
-                      />
-                      <input 
-                        type="tel" 
-                        placeholder="WhatsApp (com DDD) *" 
-                        className="w-full p-3 border border-stone-200 rounded-sm bg-stone-50 focus:ring-1 focus:ring-orange-800 focus:border-orange-800 outline-none transition" 
-                        value={checkoutForm.whatsapp} 
-                        onChange={e => setCheckoutForm({...checkoutForm, whatsapp: e.target.value})} 
-                      />
-                      <textarea 
-                        placeholder="Endereço Completo *" 
-                        className="w-full p-3 border border-stone-200 rounded-sm bg-stone-50 h-24 resize-none focus:ring-1 focus:ring-orange-800 focus:border-orange-800 outline-none transition" 
-                        value={checkoutForm.address} 
-                        onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} 
-                      />
-                      <textarea 
-                        placeholder="Observações (ex: Troco para 50, sem cebola...)" 
-                        className="w-full p-3 border border-stone-200 rounded-sm bg-stone-50 h-20 resize-none focus:ring-1 focus:ring-orange-800 focus:border-orange-800 outline-none transition" 
-                        value={checkoutForm.notes} 
-                        onChange={e => setCheckoutForm({...checkoutForm, notes: e.target.value})} 
-                      />
+                  {cart.map(item => (
+                    <div key={item.id} className="flex gap-4 p-4 bg-white border border-stone-200 rounded-sm">
+                       <div className="flex-1">
+                          <h4 className="font-bold text-stone-800 font-serif">{item.name}</h4>
+                          <p className="text-orange-800 font-bold text-sm">{formatCurrency(item.price)}</p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <button onClick={() => updateQty(item.id, -1)} className="p-1 hover:bg-stone-100"><Minus size={14}/></button>
+                            <span className="text-sm font-bold">{item.qty}</span>
+                            <button onClick={() => updateQty(item.id, 1)} className="p-1 hover:bg-stone-100"><Plus size={14}/></button>
+                          </div>
+                       </div>
+                       <button onClick={() => removeFromCart(item.id)} className="text-stone-300 hover:text-red-600 self-start"><Trash2 size={18}/></button>
                     </div>
+                  ))}
+                  <div className="bg-white p-4 rounded-sm space-y-3 border border-stone-200">
+                    <h3 className="font-bold text-sm uppercase">Dados de Entrega</h3>
+                    <input type="text" placeholder="Seu Nome *" className="w-full p-2 border border-stone-200 rounded-sm" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} />
+                    <input type="tel" placeholder="WhatsApp *" className="w-full p-2 border border-stone-200 rounded-sm" value={checkoutForm.whatsapp} onChange={e => setCheckoutForm({...checkoutForm, whatsapp: e.target.value})} />
+                    <textarea placeholder="Endereço *" className="w-full p-2 border border-stone-200 rounded-sm h-20 resize-none" value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} />
+                    <textarea placeholder="Obs" className="w-full p-2 border border-stone-200 rounded-sm h-16 resize-none" value={checkoutForm.notes} onChange={e => setCheckoutForm({...checkoutForm, notes: e.target.value})} />
                   </div>
                 </div>
               )}
             </div>
-            
-            <div className="p-6 bg-white border-t border-stone-200 space-y-4 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-              <div className="flex justify-between items-end">
-                <span className="text-stone-500 font-medium">Total do Pedido</span>
-                <span className="text-2xl font-bold text-stone-900">{formatCurrency(cartTotal)}</span>
-              </div>
-              <button 
-                onClick={placeOrderWhatsApp} 
-                disabled={cart.length === 0}
-                className="w-full py-4 bg-green-600 text-white rounded-sm font-bold hover:bg-green-700 active:bg-green-800 transition-colors flex items-center justify-center gap-2 shadow-lg disabled:bg-stone-300 disabled:cursor-not-allowed"
-              >
-                <Send size={20} /> ENVIAR PEDIDO NO WHATSAPP
+            <div className="p-6 bg-white border-t border-stone-200 space-y-4">
+              <div className="flex justify-between text-xl font-bold"><span>Total</span><span>{formatCurrency(cartTotal)}</span></div>
+              <button onClick={placeOrderWhatsApp} className="w-full py-4 bg-green-700 text-white rounded-sm font-bold hover:bg-green-800 flex items-center justify-center gap-2">
+                <Send size={20} /> ENVIAR PEDIDO
               </button>
             </div>
           </div>
@@ -354,16 +268,6 @@ const AdminArea = ({
   updateOrderStatus, handleSaveProduct, handleDeleteProduct,
   isProductFormOpen, setIsProductFormOpen, editingProduct, setEditingProduct
 }) => {
-  const [productForm, setProductForm] = useState({ name: '', price: '', category: 'Assados', description: '', image: '' });
-
-  useEffect(() => {
-    if (editingProduct) {
-      setProductForm(editingProduct);
-    } else {
-      setProductForm({ name: '', price: '', category: 'Assados', description: '', image: '' });
-    }
-  }, [editingProduct]);
-
   if (!isAdminMode) {
       return (
           <LoginScreen 
@@ -375,15 +279,10 @@ const AdminArea = ({
   }
   
   const stats = {
-    totalSales: orders.filter(o => o.status !== 'cancelado').reduce((acc, o) => acc + (o.total || 0), 0),
+    totalSales: orders.reduce((acc, o) => acc + (o.total || 0), 0),
     totalOrders: orders.length,
     pendingOrders: orders.filter(o => o.status === 'pendente' || o.status === 'preparando').length,
     activeDeliveries: orders.filter(o => o.status === 'em_entrega').length
-  };
-
-  const handleProductSubmit = (e) => {
-    e.preventDefault();
-    handleSaveProduct(productForm);
   };
 
   return (
@@ -394,129 +293,53 @@ const AdminArea = ({
           <div><h2 className="font-bold text-lg font-serif">Admin</h2></div>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setAdminTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors ${adminTab === 'dashboard' ? 'bg-orange-900 text-white shadow-md' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}><LayoutDashboard size={20}/> Dashboard</button>
-          <button onClick={() => setAdminTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors ${adminTab === 'orders' ? 'bg-orange-900 text-white shadow-md' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}><Package size={20}/> Pedidos (KDS)</button>
-          <button onClick={() => setAdminTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm transition-colors ${adminTab === 'menu' ? 'bg-orange-900 text-white shadow-md' : 'text-stone-400 hover:bg-stone-800 hover:text-white'}`}><Menu size={20}/> Cardápio</button>
+          <button onClick={() => setAdminTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'dashboard' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><LayoutDashboard size={20}/> Dashboard</button>
+          <button onClick={() => setAdminTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'orders' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><Package size={20}/> Pedidos (KDS)</button>
+          <button onClick={() => setAdminTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm ${adminTab === 'menu' ? 'bg-orange-900' : 'hover:bg-stone-800'}`}><Menu size={20}/> Cardápio</button>
         </nav>
         <div className="p-4 border-t border-stone-800">
-           <button onClick={() => { setView('landing'); setIsAdminMode(false); }} className="w-full flex items-center gap-2 text-stone-500 hover:text-white transition-colors px-4 py-2"><LogOut size={18}/> Sair</button>
+           <button onClick={() => { signOut(auth); setView('landing'); setIsAdminMode(false); }} className="text-stone-500 hover:text-white flex gap-2"><ArrowRight className="rotate-180"/> Sair</button>
         </div>
       </aside>
-      
-      <main className="flex-1 p-6 overflow-y-auto h-screen">
+
+      <main className="flex-1 p-6 overflow-y-auto">
         {adminTab === 'dashboard' && (
-          <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold text-stone-800 font-serif border-l-4 border-orange-800 pl-4">Visão Geral</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-green-600 rounded-sm">
-                <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-stone-500 text-xs font-bold uppercase tracking-wider">Faturamento</h3>
-                    <DollarSign className="text-green-600" size={20} />
-                </div>
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-stone-800 font-serif">Visão Geral</h2>
+            <div className="grid grid-cols-4 gap-6">
+              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-green-600">
+                <h3 className="text-stone-500 text-sm font-bold uppercase">Faturamento</h3>
                 <p className="text-3xl font-bold text-stone-900">{formatCurrency(stats.totalSales)}</p>
               </div>
-              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-blue-600 rounded-sm">
-                 <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-stone-500 text-xs font-bold uppercase tracking-wider">Pedidos Totais</h3>
-                    <Package className="text-blue-600" size={20} />
-                </div>
+              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-orange-600">
+                <h3 className="text-stone-500 text-sm font-bold uppercase">Pedidos</h3>
                 <p className="text-3xl font-bold text-stone-900">{stats.totalOrders}</p>
               </div>
-              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-orange-600 rounded-sm">
-                <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-stone-500 text-xs font-bold uppercase tracking-wider">Na Cozinha</h3>
-                    <ChefHat className="text-orange-600" size={20} />
-                </div>
-                <p className="text-3xl font-bold text-stone-900">{stats.pendingOrders}</p>
-              </div>
-              <div className="bg-white p-6 shadow-sm border border-stone-200 border-l-4 border-l-purple-600 rounded-sm">
-                <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-stone-500 text-xs font-bold uppercase tracking-wider">Em Entrega</h3>
-                    <Bike className="text-purple-600" size={20} />
-                </div>
-                <p className="text-3xl font-bold text-stone-900">{stats.activeDeliveries}</p>
-              </div>
-            </div>
-            
-            <div className="bg-white p-6 shadow-sm border border-stone-200 rounded-sm">
-                <h3 className="font-bold text-stone-800 mb-4 font-serif">Últimos Pedidos</h3>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-stone-100 text-stone-600 uppercase font-bold text-xs">
-                            <tr>
-                                <th className="px-4 py-3">ID</th>
-                                <th className="px-4 py-3">Cliente</th>
-                                <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-100">
-                            {orders.slice(0, 5).map(o => (
-                                <tr key={o.id}>
-                                    <td className="px-4 py-3 font-mono">#{o.id.slice(0,4)}</td>
-                                    <td className="px-4 py-3 font-medium">{o.customer}</td>
-                                    <td className="px-4 py-3"><Badge color={getStatusColor(o.status)}>{o.status}</Badge></td>
-                                    <td className="px-4 py-3">{formatCurrency(o.total)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
             </div>
           </div>
         )}
 
         {adminTab === 'orders' && (
-          <div className="space-y-6 animate-fade-in">
-            <h2 className="text-2xl font-bold text-stone-800 font-serif border-l-4 border-orange-800 pl-4">KDS - Cozinha</h2>
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-stone-800 font-serif">KDS - Cozinha</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado').length === 0 && (
-                  <p className="col-span-full text-center text-stone-400 py-10">Nenhum pedido pendente.</p>
-              )}
-              {orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado').map(order => (
-                <div key={order.id} className="bg-white rounded-sm shadow-md border border-stone-200 flex flex-col overflow-hidden">
-                  <div className={`p-4 border-b flex justify-between items-center ${order.status === 'pendente' ? 'bg-yellow-50' : 'bg-white'}`}>
-                    <span className="font-mono font-bold text-stone-600">#{order.id.slice(0, 4)}</span>
-                    <Badge color={getStatusColor(order.status)}>{order.status}</Badge>
+              {orders.filter(o => o.status !== 'entregue').map(order => (
+                <div key={order.id} className="bg-white rounded-sm shadow-sm border border-stone-200 flex flex-col">
+                  <div className="p-4 border-b bg-stone-50 flex justify-between">
+                    <span className="font-mono font-bold">#{order.id.slice(0, 4)}</span>
+                    <Badge color={getStatusColor(order.status)}>{order.status.toUpperCase()}</Badge>
                   </div>
-                  <div className="p-5 flex-1 space-y-4">
-                    <div>
-                        <h4 className="font-bold text-lg font-serif text-stone-800">{order.customer}</h4>
-                        {order.notes && <p className="text-xs text-red-600 bg-red-50 p-2 mt-1 rounded border border-red-100 font-bold">Obs: {order.notes}</p>}
-                    </div>
-                    <ul className="bg-stone-50 p-3 rounded-sm text-sm space-y-2 border border-stone-100">
-                      {order.items?.map((i, idx) => (
-                          <li key={idx} className="flex justify-between border-b border-stone-200 pb-1 last:border-0 last:pb-0">
-                              <span>{i.name}</span>
-                              <span className="font-bold">x{i.qty}</span>
-                          </li>
-                      ))}
+                  <div className="p-4 flex-1">
+                    <h4 className="font-bold text-lg font-serif">{order.customer}</h4>
+                    <p className="text-xs text-stone-500 mb-2">{order.address}</p>
+                    <ul className="bg-yellow-50 p-3 rounded-sm text-sm space-y-1">
+                      {order.items?.map((i, idx) => <li key={idx}><b>{i.qty}x</b> {i.name}</li>)}
                     </ul>
-                    <div className="text-xs text-stone-500 flex items-center gap-1">
-                        <Clock size={12}/> {new Date(order.createdAt?.seconds * 1000).toLocaleTimeString()}
-                    </div>
                   </div>
-                  <div className="p-4 grid grid-cols-2 gap-2 bg-stone-50 border-t border-stone-100">
-                    {order.status === 'pendente' && (
-                        <button onClick={() => updateOrderStatus(order.id, 'preparando')} className="col-span-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-sm transition-colors flex justify-center items-center gap-2">
-                            <UtensilsCrossed size={16}/> INICIAR PREPARO
-                        </button>
-                    )}
-                    {order.status === 'preparando' && (
-                        <button onClick={() => updateOrderStatus(order.id, 'pronto')} className="col-span-2 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-sm transition-colors flex justify-center items-center gap-2">
-                            <CheckCircle size={16}/> MARCAR PRONTO
-                        </button>
-                    )}
-                    {order.status === 'pronto' && (
-                        <div className="col-span-2 text-center text-green-800 font-bold py-3 bg-green-100 rounded-sm border border-green-200 flex justify-center items-center gap-2">
-                             AGUARDANDO ENTREGADOR
-                        </div>
-                    )}
-                     {order.status === 'em_entrega' && (
-                        <div className="col-span-2 text-center text-purple-800 font-bold py-3 bg-purple-100 rounded-sm border border-purple-200 flex justify-center items-center gap-2">
-                             <Bike size={16} /> EM ENTREGA
-                        </div>
-                    )}
+                  <div className="p-4 grid grid-cols-2 gap-2 bg-stone-50">
+                    {order.status === 'pendente' && <button onClick={() => updateOrderStatus(order.id, 'preparando')} className="col-span-2 py-2 bg-blue-700 text-white font-bold rounded-sm">INICIAR</button>}
+                    {order.status === 'preparando' && <button onClick={() => updateOrderStatus(order.id, 'pronto')} className="col-span-2 py-2 bg-green-700 text-white font-bold rounded-sm">PRONTO</button>}
+                    {order.status === 'pronto' && <div className="col-span-2 text-center text-green-800 font-bold py-2 bg-green-100 rounded-sm">AGUARDANDO</div>}
                   </div>
                 </div>
               ))}
@@ -525,78 +348,52 @@ const AdminArea = ({
         )}
 
         {adminTab === 'menu' && (
-          <div className="space-y-6 animate-fade-in">
-             <div className="flex justify-between items-center border-b pb-4 border-stone-200">
-                <h2 className="text-2xl font-bold text-stone-800 font-serif border-l-4 border-orange-800 pl-4">Gerenciar Cardápio</h2>
-                <button onClick={() => { setEditingProduct(null); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-800 text-white rounded-sm font-bold hover:bg-stone-900 flex items-center gap-2">
-                    <Plus size={18}/> Novo Produto
-                </button>
+           <div className="space-y-6">
+             <div className="flex justify-between items-center">
+               <h2 className="text-2xl font-bold text-stone-800 font-serif">Cardápio</h2>
+               <button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados'}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-sm font-bold text-sm">NOVO ITEM</button>
              </div>
-
-             {/* Formulário de Produto */}
-             {isProductFormOpen && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 backdrop-blur-sm p-4">
-                     <div className="bg-white rounded-sm shadow-xl max-w-lg w-full p-6 border-t-4 border-orange-800">
-                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold font-serif">{editingProduct ? 'Editar Produto' : 'Novo Produto'}</h3>
-                            <button onClick={() => setIsProductFormOpen(false)}><X size={24}/></button>
-                         </div>
-                         <form onSubmit={handleProductSubmit} className="space-y-4">
-                             <div>
-                                 <label className="block text-sm font-bold text-stone-600 mb-1">Nome</label>
-                                 <input required type="text" className="w-full p-2 border border-stone-300 rounded-sm" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} />
-                             </div>
-                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-stone-600 mb-1">Preço (R$)</label>
-                                    <input required type="number" step="0.01" className="w-full p-2 border border-stone-300 rounded-sm" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-stone-600 mb-1">Categoria</label>
-                                    <select className="w-full p-2 border border-stone-300 rounded-sm" value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})}>
-                                        <option>Assados</option>
-                                        <option>Acompanhamentos</option>
-                                        <option>Bebidas</option>
-                                        <option>Combos</option>
-                                    </select>
-                                </div>
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-bold text-stone-600 mb-1">Descrição</label>
-                                 <textarea className="w-full p-2 border border-stone-300 rounded-sm h-20" value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} />
-                             </div>
-                             <div>
-                                 <label className="block text-sm font-bold text-stone-600 mb-1">URL da Imagem</label>
-                                 <input type="url" className="w-full p-2 border border-stone-300 rounded-sm" placeholder="https://..." value={productForm.image} onChange={e => setProductForm({...productForm, image: e.target.value})} />
-                             </div>
-                             <button type="submit" className="w-full py-3 bg-orange-800 text-white font-bold rounded-sm hover:bg-orange-900 mt-4">
-                                 {editingProduct ? 'ATUALIZAR' : 'CADASTRAR'}
-                             </button>
-                         </form>
-                     </div>
-                 </div>
-             )}
-
-             <div className="grid gap-4">
-                {products.map(p => (
-                    <div key={p.id} className="bg-white p-4 rounded-sm shadow-sm border border-stone-200 flex items-center justify-between group">
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 bg-stone-100 rounded-sm overflow-hidden">
-                                {p.image ? <img src={p.image} className="w-full h-full object-cover"/> : <ImageIcon className="m-auto mt-4 text-stone-400"/>}
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-stone-800">{p.name}</h4>
-                                <span className="text-xs font-bold text-stone-500 uppercase">{p.category}</span>
-                                <span className="ml-3 text-orange-800 font-bold">{formatCurrency(p.price)}</span>
-                            </div>
-                        </div>
-                        <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="p-2 text-stone-500 hover:bg-stone-100 rounded"><Edit size={18}/></button>
-                            <button onClick={() => handleDeleteProduct(p.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
-                        </div>
-                    </div>
-                ))}
+             <div className="bg-white rounded-sm shadow-sm border border-stone-200">
+               <table className="w-full text-left">
+                 <thead className="bg-stone-100 text-stone-500 font-bold text-xs uppercase">
+                   <tr><th className="p-4">Item</th><th className="p-4">Preço</th><th className="p-4 text-right">Ações</th></tr>
+                 </thead>
+                 <tbody className="divide-y divide-stone-100">
+                   {products.map(p => (
+                     <tr key={p.id}>
+                       <td className="p-4 flex items-center gap-3"><img src={p.image} className="w-10 h-10 rounded-sm bg-stone-200"/> <span>{p.name}</span></td>
+                       <td className="p-4 font-bold">{formatCurrency(p.price)}</td>
+                       <td className="p-4 text-right">
+                         <button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="text-blue-700 font-bold text-sm mr-3">EDITAR</button>
+                         <button onClick={() => handleDeleteProduct(p.id)} className="text-red-600 font-bold text-sm">EXCLUIR</button>
+                       </td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
              </div>
+           </div>
+        )}
+
+        {isProductFormOpen && editingProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-stone-900/60" onClick={() => setIsProductFormOpen(false)} />
+            <div className="relative bg-white rounded-sm shadow-2xl w-full max-w-lg p-6 space-y-4">
+               <h3 className="font-bold text-lg uppercase">{editingProduct.id ? 'Editar' : 'Novo'} Produto</h3>
+               <input className="w-full p-2 border border-stone-300" placeholder="Nome" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} autoFocus />
+               <input className="w-full p-2 border border-stone-300" placeholder="URL da Imagem" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
+               <div className="grid grid-cols-2 gap-4">
+                  <input className="w-full p-2 border border-stone-300" type="number" placeholder="Preço" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} />
+                  <select className="w-full p-2 border border-stone-300" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
+                    <option>Assados</option><option>Acompanhamentos</option><option>Sobremesas</option>
+                  </select>
+               </div>
+               <textarea className="w-full p-2 border border-stone-300" placeholder="Descrição" value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} />
+               <div className="flex justify-end gap-2 pt-4">
+                 <button onClick={() => setIsProductFormOpen(false)} className="px-4 py-2 text-stone-600 font-bold">CANCELAR</button>
+                 <button onClick={handleSaveProduct} className="px-6 py-2 bg-green-700 text-white font-bold rounded-sm">SALVAR</button>
+               </div>
+            </div>
           </div>
         )}
       </main>
@@ -604,317 +401,248 @@ const AdminArea = ({
   );
 };
 
-const DriverArea = ({ orders, updateOrderStatus, setIsDriverMode, setView, isDriverMode }) => {
-    if (!isDriverMode) {
-        return (
-            <LoginScreen 
-                role="driver" 
-                onLogin={() => setIsDriverMode(true)} 
-                onBack={() => { setView('landing'); setIsDriverMode(false); }} 
-            />
-        );
-    }
+const DriverArea = ({
+  user, auth, isDriverMode, setIsDriverMode, setView,
+  orders, driverTab, setDriverTab, updateOrderStatus
+}) => {
+  if (!isDriverMode) {
+      return (
+          <LoginScreen 
+              role="driver" 
+              onLogin={() => setIsDriverMode(true)} 
+              onBack={() => { setView('landing'); setIsDriverMode(false); }} 
+          />
+      );
+  }
+  
+  const availableOrders = orders.filter(o => o.status === 'pronto');
+  const myDeliveries = orders.filter(o => o.status === 'em_entrega');
 
-    const availableDeliveries = orders.filter(o => o.status === 'pronto');
-    const myDeliveries = orders.filter(o => o.status === 'em_entrega');
-
-    return (
-        <div className="min-h-screen bg-stone-100 font-sans pb-20">
-             <header className="bg-stone-900 text-white p-4 shadow-md sticky top-0 z-10">
-                <div className="max-w-md mx-auto flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <Bike className="text-orange-500" size={24} />
-                        <h1 className="font-bold text-lg font-serif">Área do Entregador</h1>
-                    </div>
-                    <button onClick={() => { setView('landing'); setIsDriverMode(false); }} className="text-xs bg-stone-800 px-3 py-1 rounded border border-stone-700">Sair</button>
-                </div>
-            </header>
-
-            <main className="max-w-md mx-auto p-4 space-y-6">
-                
-                {/* Minhas Entregas Atuais */}
-                <section>
-                    <h2 className="text-stone-800 font-bold mb-3 flex items-center gap-2">
-                        <Navigation size={18} className="text-blue-600"/> Em Rota
-                    </h2>
-                    {myDeliveries.length === 0 ? (
-                         <div className="bg-white p-6 rounded-sm border border-stone-200 text-center text-stone-400 text-sm">
-                             Você não tem entregas ativas.
-                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {myDeliveries.map(order => (
-                                <div key={order.id} className="bg-white rounded-sm shadow-md border-l-4 border-l-blue-600 overflow-hidden">
-                                    <div className="p-4">
-                                        <div className="flex justify-between mb-2">
-                                            <span className="font-mono font-bold">#{order.id.slice(0,4)}</span>
-                                            <span className="text-blue-600 font-bold text-xs uppercase">Em andamento</span>
-                                        </div>
-                                        <h3 className="font-bold text-lg mb-1">{order.customer}</h3>
-                                        <div className="flex items-start gap-2 text-stone-600 text-sm bg-stone-50 p-2 rounded">
-                                            <MapPin size={16} className="mt-1 flex-shrink-0 text-red-500" />
-                                            <p>{order.address}</p>
-                                        </div>
-                                        {order.whatsapp && (
-                                            <a href={`https://wa.me/55${order.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 text-green-600 font-bold text-sm hover:underline">
-                                                <Phone size={16} /> Chamar no WhatsApp
-                                            </a>
-                                        )}
-                                        <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
-                                            <span className="text-sm text-stone-500">Total a cobrar: <b className="text-stone-800">{formatCurrency(order.total)}</b></span>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={() => updateOrderStatus(order.id, 'entregue')}
-                                        className="w-full py-4 bg-green-600 hover:bg-green-700 text-white font-bold flex justify-center items-center gap-2"
-                                    >
-                                        <CheckSquare size={18} /> CONFIRMAR ENTREGA
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </section>
-
-                {/* Disponíveis para Retirada */}
-                <section>
-                    <h2 className="text-stone-800 font-bold mb-3 flex items-center gap-2">
-                        <Package size={18} className="text-orange-600"/> Aguardando Retirada
-                    </h2>
-                     {availableDeliveries.length === 0 ? (
-                         <div className="bg-stone-50 p-6 rounded-sm border border-dashed border-stone-300 text-center text-stone-400 text-sm">
-                             Nenhum pedido pronto na cozinha.
-                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {availableDeliveries.map(order => (
-                                <div key={order.id} className="bg-white rounded-sm shadow-sm border border-stone-200 opacity-90 hover:opacity-100 transition-opacity">
-                                    <div className="p-4">
-                                        <div className="flex justify-between mb-1">
-                                            <span className="font-mono font-bold text-stone-500">#{order.id.slice(0,4)}</span>
-                                            <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-0.5 rounded">PRONTO</span>
-                                        </div>
-                                        <h3 className="font-bold text-stone-800">{order.customer}</h3>
-                                        <p className="text-xs text-stone-500 truncate">{order.address}</p>
-                                    </div>
-                                    <button 
-                                        onClick={() => updateOrderStatus(order.id, 'em_entrega')}
-                                        className="w-full py-3 bg-stone-800 hover:bg-stone-900 text-white font-bold text-sm flex justify-center items-center gap-2"
-                                    >
-                                        <Bike size={16} /> PEGAR ENTREGA
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </section>
-            </main>
-        </div>
-    );
+  return (
+    <div className="min-h-screen bg-stone-100 flex flex-col font-sans">
+      <header className="bg-stone-900 text-white shadow-lg sticky top-0 z-10 p-4 flex justify-between">
+         <h2 className="font-bold text-lg flex gap-2"><Bike className="text-green-500" /> Área do Entregador</h2>
+         <button onClick={() => { signOut(auth); setView('landing'); setIsDriverMode(false); }}>SAIR</button>
+      </header>
+      <div className="bg-stone-800 grid grid-cols-2">
+         <button onClick={() => setDriverTab('available')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'available' ? 'bg-stone-700 text-white border-b-4 border-white' : 'text-stone-400'}`}>Disponíveis ({availableOrders.length})</button>
+         <button onClick={() => setDriverTab('active')} className={`py-3 text-xs font-bold uppercase ${driverTab === 'active' ? 'bg-stone-700 text-white border-b-4 border-purple-500' : 'text-stone-400'}`}>Em Rota ({myDeliveries.length})</button>
+      </div>
+      <main className="p-4 space-y-4">
+         {driverTab === 'available' && availableOrders.map(o => (
+           <div key={o.id} className="bg-white p-5 rounded-sm border border-stone-200">
+             <h3 className="font-bold text-lg">{o.customer}</h3>
+             <p className="text-stone-500 text-sm mb-3">{o.address}</p>
+             <button onClick={() => updateOrderStatus(o.id, 'em_entrega')} className="w-full py-3 bg-green-700 text-white font-bold rounded-sm">ACEITAR</button>
+           </div>
+         ))}
+         {driverTab === 'active' && myDeliveries.map(o => (
+           <div key={o.id} className="bg-white p-5 rounded-sm border-l-4 border-purple-600 shadow-md">
+             <h3 className="font-bold text-lg">{o.customer}</h3>
+             <p className="text-stone-800 text-sm mb-3 font-bold">{o.address}</p>
+             <div className="grid grid-cols-2 gap-2">
+               <button className="py-2 bg-stone-100 font-bold text-xs">MAPS</button>
+               <button onClick={() => updateOrderStatus(o.id, 'entregue')} className="py-2 bg-stone-800 text-white font-bold text-xs">ENTREGUE</button>
+             </div>
+           </div>
+         ))}
+      </main>
+    </div>
+  );
 };
 
-// --- APP PRINCIPAL ---
-const App = () => {
-  // Estado Global
-  const [view, setView] = useState('landing'); // landing, customer, admin, driver
-  const [user, setUser] = useState(null);
-  
-  // Estado de Dados
+export default function FoodBusinessApp() {
+  const [view, setView] = useState('landing');
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [cart, setCart] = useState([]);
-  
-  // Estado de UI
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('Todos');
-  const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '' });
+  const [isCartOpen, setIsCartOpen] = useState(false);
   
-  // Estado de Acesso
+  // Estado de Login e Modos
+  const [user, setUser] = useState(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isDriverMode, setIsDriverMode] = useState(false);
+
+  // Estados Admin
   const [adminTab, setAdminTab] = useState('dashboard');
-  
-  // Estado Admin
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
-  // Inicialização Auth e Listeners
+  // Estados Driver
+  const [driverTab, setDriverTab] = useState('available');
+
+  // Estado Checkout
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '' });
+
+  // 1. EFEITO DE INICIALIZAÇÃO E AUTH
   useEffect(() => {
-    const initApp = async () => {
-      // Auth Anônimo para garantir leitura do banco
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
-      }
-    };
-    initApp();
-
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-       setUser(currentUser);
-       if (currentUser) {
-           // Listeners de Firestore (Regra 1: artifacts/{appId}/public/data/...)
-           const productsRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-           const ordersRef = collection(db, 'artifacts', appId, 'public', 'data', 'orders');
-           // Ordenação precisa ser em memória ou via query simples se index existir. Vamos usar sort JS para segurança (Regra 2)
-           
-           const unsubProd = onSnapshot(productsRef, (snap) => {
-               const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-               // Sort básico por nome
-               setProducts(items.sort((a,b) => a.name.localeCompare(b.name)));
-           }, (err) => console.error("Erro products", err));
-
-           const unsubOrders = onSnapshot(ordersRef, (snap) => {
-               const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-               // Sort por data (mais recente primeiro)
-               setOrders(items.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-           }, (err) => console.error("Erro orders", err));
-
-           return () => { unsubProd(); unsubOrders(); };
-       }
+      setUser(currentUser);
+      if (!currentUser) {
+        if (view === 'customer' || view === 'landing') {
+             signInAnonymously(auth).catch(() => {});
+        }
+      }
     });
     return () => unsubscribeAuth();
+  }, [view]);
+
+  // 2. EFEITO PARA CARREGAR DADOS DO FIRESTORE
+  useEffect(() => {
+    const productsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'products');
+    const unsubProducts = onSnapshot(productsRef, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setProducts(items);
+    }, (error) => console.error("Erro ao carregar produtos:", error));
+
+    const ordersRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders');
+    const unsubOrders = onSnapshot(ordersRef, (snapshot) => {
+      let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setOrders(items);
+    }, (error) => console.error("Erro ao carregar pedidos:", error));
+
+    return () => {
+      unsubProducts();
+      unsubOrders();
+    };
   }, []);
 
-  // --- Ações do Carrinho ---
+  // --- AÇÕES DO CARRINHO ---
   const addToCart = (product) => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
-      }
+      if (existing) return prev.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
       return [...prev, { ...product, qty: 1 }];
     });
     setIsCartOpen(true);
   };
 
   const updateQty = (id, delta) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) return { ...item, qty: Math.max(1, item.qty + delta) };
-      return item;
-    }));
+    setCart(prev => prev.map(item => item.id === id ? { ...item, qty: Math.max(1, item.qty + delta) } : item));
   };
 
   const removeFromCart = (id) => setCart(prev => prev.filter(item => item.id !== id));
-
+  
   const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
 
-  // --- Ações de Checkout ---
+  // --- AÇÕES DE PEDIDO ---
   const placeOrderWhatsApp = async () => {
+    if (cart.length === 0) return;
     if (!checkoutForm.name || !checkoutForm.whatsapp || !checkoutForm.address) {
-      alert("Por favor, preencha todos os campos obrigatórios (*)");
+      alert("Preencha os campos obrigatórios.");
       return;
     }
 
-    const orderData = {
-      customer: checkoutForm.name,
-      whatsapp: checkoutForm.whatsapp,
-      address: checkoutForm.address,
-      notes: checkoutForm.notes,
-      items: cart,
-      total: cartTotal,
-      status: 'pendente',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
     try {
-      // Salvar no Firestore
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderData);
+      const orderData = {
+        customer: checkoutForm.name,
+        whatsapp: checkoutForm.whatsapp,
+        address: checkoutForm.address,
+        notes: checkoutForm.notes,
+        items: cart.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+        total: cartTotal,
+        status: 'pendente',
+        createdAt: new Date().toISOString(),
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      };
+
+      const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), orderData);
+
+      let message = `*NOVO PEDIDO #${docRef.id.slice(0, 4).toUpperCase()} - FAMILIA DAVANZO*\n\n`;
+      message += `*Cliente:* ${checkoutForm.name}\n`;
+      message += `*Endereço:* ${checkoutForm.address}\n`;
+      if(checkoutForm.notes) message += `*Obs:* ${checkoutForm.notes}\n`;
+      message += `--------------------------------\n`;
+      cart.forEach(item => {
+        message += `${item.qty}x ${item.name} - ${formatCurrency(item.price * item.qty)}\n`;
+      });
+      message += `--------------------------------\n`;
+      message += `*TOTAL: ${formatCurrency(cartTotal)}*\n`;
       
-      // Gerar Link WhatsApp
-      const msg = `*Novo Pedido - Assados Davanzo*\n\n` +
-                  `Cliente: ${checkoutForm.name}\n` +
-                  `Endereço: ${checkoutForm.address}\n\n` +
-                  `*Itens:*\n` +
-                  cart.map(i => `${i.qty}x ${i.name} - ${formatCurrency(i.price)}`).join('\n') +
-                  `\n\n*Total: ${formatCurrency(cartTotal)}*\n` +
-                  (checkoutForm.notes ? `Obs: ${checkoutForm.notes}` : '');
-      
-      const whatsappUrl = `https://wa.me/55${checkoutForm.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`;
-      
-      setCart([]);
-      setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '' });
-      setIsCartOpen(false);
-      
-      // Abrir WhatsApp (simulado com window.open)
+      const whatsappUrl = `https://wa.me/5511999999999?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
-      
-      alert("Pedido realizado com sucesso!");
-    } catch (error) {
-      console.error("Erro ao criar pedido", error);
-      alert("Erro ao enviar pedido.");
+
+      setCart([]);
+      setIsCartOpen(false);
+      setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '' });
+
+    } catch (err) {
+      console.error("Erro ao criar pedido:", err);
+      alert("Houve um erro ao processar o pedido. Tente novamente.");
     }
   };
 
-  // --- Ações Admin / Driver ---
-  const updateOrderStatus = async (orderId, newStatus) => {
-      try {
-          await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId), {
-              status: newStatus,
-              updatedAt: new Date()
-          });
-      } catch (e) {
-          console.error("Erro ao atualizar status", e);
-      }
-  };
+  // --- AÇÕES DE ADMIN (CRUD PRODUTOS) ---
+  const handleSaveProduct = async (e) => {
+    e.preventDefault();
+    const productData = {
+      name: editingProduct.name,
+      price: parseFloat(editingProduct.price),
+      category: editingProduct.category,
+      description: editingProduct.description,
+      image: editingProduct.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
+    };
 
-  const handleSaveProduct = async (productData) => {
-      try {
-          if (editingProduct) {
-              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', editingProduct.id), productData);
-          } else {
-              await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), productData);
-          }
-          setIsProductFormOpen(false);
-          setEditingProduct(null);
-      } catch (e) {
-          console.error("Erro ao salvar produto", e);
+    try {
+      if (editingProduct.id) {
+        const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', editingProduct.id);
+        await updateDoc(ref, productData);
+      } else {
+        await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'products'), productData);
       }
+      setIsProductFormOpen(false);
+      setEditingProduct(null);
+    } catch (err) {
+      console.error("Erro ao salvar produto:", err);
+      alert("Erro ao salvar produto.");
+    }
   };
 
   const handleDeleteProduct = async (id) => {
-      if (window.confirm("Tem certeza que deseja excluir este produto?")) {
-          try {
-              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
-          } catch (e) { console.error(e); }
+    if (window.confirm("Excluir produto permanentemente?")) {
+      try {
+        await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', id));
+      } catch (err) {
+        console.error("Erro ao excluir:", err);
       }
+    }
+  };
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const ref = doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId);
+      await updateDoc(ref, { status: newStatus });
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+    }
   };
 
   return (
-    <div>
+    <div className="font-sans text-gray-900">
       {view === 'landing' && <LandingPage setView={setView} setIsAdminMode={setIsAdminMode} setIsDriverMode={setIsDriverMode} />}
-      
-      {view === 'customer' && (
-        <CustomerArea 
+      {view === 'customer' && <CustomerArea 
           products={products} cart={cart} addToCart={addToCart} updateQty={updateQty} 
           removeFromCart={removeFromCart} cartTotal={cartTotal} 
           checkoutForm={checkoutForm} setCheckoutForm={setCheckoutForm} 
           placeOrderWhatsApp={placeOrderWhatsApp} isCartOpen={isCartOpen} 
           setIsCartOpen={setIsCartOpen} activeCategory={activeCategory} 
           setActiveCategory={setActiveCategory} setView={setView} 
-        />
-      )}
-      
-      {view === 'admin' && (
-        <AdminArea 
+      />}
+      {view === 'admin' && <AdminArea 
           user={user} auth={auth} isAdminMode={isAdminMode} setIsAdminMode={setIsAdminMode} 
           setView={setView} adminTab={adminTab} setAdminTab={setAdminTab} 
           orders={orders} products={products} updateOrderStatus={updateOrderStatus} 
           handleSaveProduct={handleSaveProduct} handleDeleteProduct={handleDeleteProduct}
           isProductFormOpen={isProductFormOpen} setIsProductFormOpen={setIsProductFormOpen}
           editingProduct={editingProduct} setEditingProduct={setEditingProduct}
-        />
-      )}
-      
-      {view === 'driver' && (
-        <DriverArea 
-            orders={orders} updateOrderStatus={updateOrderStatus} 
-            setIsDriverMode={setIsDriverMode} setView={setView} isDriverMode={isDriverMode}
-        />
-      )}
+      />}
+      {view === 'driver' && <DriverArea 
+          user={user} auth={auth} isDriverMode={isDriverMode} setIsDriverMode={setIsDriverMode}
+          setView={setView} orders={orders} driverTab={driverTab} setDriverTab={setDriverTab}
+          updateOrderStatus={updateOrderStatus}
+      />}
     </div>
   );
-};
-
-export default App;
+}
