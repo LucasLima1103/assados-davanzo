@@ -175,31 +175,52 @@ const LoginScreen = ({ role, onLogin, onBack }) => {
   );
 };
 
-const LandingPage = ({ setView, setIsAdminMode, setIsDriverMode }) => (
-  <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white text-center font-serif">
-    <div className="mb-8 p-8 bg-orange-800 rounded-full shadow-2xl border-4 border-orange-200">
-      <ChefHat size={80} className="text-white" />
+const LandingPage = ({ setView, setIsAdminMode, setIsDriverMode }) => {
+  const [showStaffMenu, setShowStaffMenu] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white text-center font-serif">
+      <div className="mb-8 p-8 bg-orange-800 rounded-full shadow-2xl border-4 border-orange-200">
+        <ChefHat size={80} className="text-white" />
+      </div>
+      <h1 className="text-4xl md:text-6xl font-bold mb-2 tracking-wide text-orange-100">Assados</h1>
+      <h2 className="text-3xl md:text-5xl font-light mb-6 text-orange-200 italic">Familia Davanzo</h2>
+      <div className="h-1 w-24 bg-orange-500 mb-8 rounded-full"></div>
+      
+      {!showStaffMenu ? (
+        <div className="w-full max-w-md font-sans flex flex-col items-center animate-in fade-in zoom-in duration-500">
+          <button onClick={() => setView('customer')} className="group relative flex flex-col items-center p-8 bg-white text-gray-800 rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border-b-4 border-orange-800 w-full">
+            <ShoppingBag size={48} className="mb-4 text-orange-800 group-hover:scale-110 transition-transform" />
+            <span className="text-2xl font-bold uppercase tracking-wider">Ver Cardápio & Pedir</span>
+            <span className="text-sm text-stone-500 mt-2 italic font-serif">Faça seu pedido online agora</span>
+          </button>
+
+          <button 
+             onClick={() => setShowStaffMenu(true)}
+             className="mt-16 text-stone-600 hover:text-stone-400 text-xs uppercase tracking-widest font-sans flex items-center gap-2 opacity-50 hover:opacity-100 transition-opacity"
+           >
+             <Lock size={12} /> Acesso Restrito
+           </button>
+        </div>
+      ) : (
+        <div className="w-full max-w-md font-sans animate-in fade-in slide-in-from-bottom-4">
+           <h3 className="text-lg font-bold mb-4 text-orange-100 uppercase tracking-widest border-b border-orange-800/50 pb-2">Área Interna</h3>
+           <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => { setIsAdminMode(false); setView('admin'); }} className="group flex flex-col items-center p-6 bg-stone-800 text-white rounded-sm border border-stone-700 hover:bg-stone-700 hover:border-orange-500 transition-all">
+                <LayoutDashboard size={32} className="mb-3 text-stone-400 group-hover:text-orange-500 transition-colors" />
+                <span className="font-bold uppercase text-sm">Gestão</span>
+              </button>
+              <button onClick={() => { setIsDriverMode(false); setView('driver'); }} className="group flex flex-col items-center p-6 bg-stone-800 text-white rounded-sm border border-stone-700 hover:bg-stone-700 hover:border-green-500 transition-all">
+                <Bike size={32} className="mb-3 text-stone-400 group-hover:text-green-500 transition-colors" />
+                <span className="font-bold uppercase text-sm">Entregas</span>
+              </button>
+           </div>
+           <button onClick={() => setShowStaffMenu(false)} className="mt-8 text-stone-500 hover:text-white underline text-sm">Voltar ao Início</button>
+        </div>
+      )}
     </div>
-    <h1 className="text-4xl md:text-6xl font-bold mb-2 tracking-wide text-orange-100">Assados</h1>
-    <h2 className="text-3xl md:text-5xl font-light mb-6 text-orange-200 italic">Familia Davanzo</h2>
-    <div className="h-1 w-24 bg-orange-500 mb-8 rounded-full"></div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl font-sans">
-      <button onClick={() => setView('customer')} className="group relative flex flex-col items-center p-8 bg-white text-gray-800 rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border-b-4 border-orange-800">
-        <ShoppingBag size={40} className="mb-4 text-orange-800 group-hover:scale-110 transition-transform" />
-        <span className="text-xl font-bold uppercase tracking-wider">Cardápio</span>
-      </button>
-      <button onClick={() => { setIsAdminMode(false); setView('admin'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
-        <LayoutDashboard size={40} className="mb-4 text-stone-400 group-hover:scale-110 transition-transform" />
-        <span className="text-xl font-bold uppercase tracking-wider">Gestão</span>
-      </button>
-      <button onClick={() => { setIsDriverMode(false); setView('driver'); }} className="group relative flex flex-col items-center p-8 bg-stone-800 text-white rounded-sm shadow-lg hover:shadow-2xl transition-all transform hover:-translate-y-1 border border-stone-700">
-        <Bike size={40} className="mb-4 text-stone-400 group-hover:scale-110 transition-transform" />
-        <span className="text-xl font-bold uppercase tracking-wider">Entregas</span>
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 const CustomerArea = ({ 
   products, cart, addToCart, updateQty, removeFromCart, cartTotal, 
