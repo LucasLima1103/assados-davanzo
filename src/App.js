@@ -314,7 +314,7 @@ export default function FoodBusinessApp() {
     return { totalSales, totalOrders, pendingOrders, activeDeliveries };
   };
 
-  // --- TELAS ---
+  // --- TELAS (Render Functions) ---
 
   const LandingPage = () => (
     <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-white text-center font-serif">
@@ -550,7 +550,7 @@ export default function FoodBusinessApp() {
               <div className="absolute inset-0 bg-stone-900/60" onClick={() => setIsProductFormOpen(false)} />
               <div className="relative bg-white rounded-sm shadow-2xl w-full max-w-lg p-6 space-y-4">
                  <h3 className="font-bold text-lg uppercase">{editingProduct.id ? 'Editar' : 'Novo'} Produto</h3>
-                 <input className="w-full p-2 border border-stone-300" placeholder="Nome" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} />
+                 <input className="w-full p-2 border border-stone-300" placeholder="Nome" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} autoFocus />
                  <input className="w-full p-2 border border-stone-300" placeholder="URL da Imagem" value={editingProduct.image} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} />
                  <div className="grid grid-cols-2 gap-4">
                     <input className="w-full p-2 border border-stone-300" type="number" placeholder="Preço" value={editingProduct.price} onChange={e => setEditingProduct({...editingProduct, price: e.target.value})} />
@@ -621,10 +621,10 @@ export default function FoodBusinessApp() {
 
   return (
     <div className="font-sans text-gray-900">
-      {view === 'landing' && <LandingPage />}
-      {view === 'customer' && <CustomerArea />}
-      {view === 'admin' && <AdminArea />}
-      {view === 'driver' && <DriverArea />}
+      {view === 'landing' && LandingPage()}
+      {view === 'customer' && CustomerArea()}
+      {view === 'admin' && AdminArea()}
+      {view === 'driver' && DriverArea()}
     </div>
   );
 }
