@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, ChefHat, UtensilsCrossed, Plus, Minus, Trash2, CheckCircle, 
-  Clock, DollarSign, LayoutDashboard, Package, Menu, X, ArrowRight, 
-  TrendingUp, Bike, MapPin, Navigation, CheckSquare, Lock, Phone, Send, 
-  Save, Edit, Image as ImageIcon, LogOut
+  DollarSign, LayoutDashboard, Package, Menu, X, ArrowRight, 
+  Bike, MapPin, Navigation, CheckSquare, Lock, Phone, Send, 
+  Edit, Image as ImageIcon, LogOut
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -26,8 +26,8 @@ import {
 } from 'firebase/firestore';
 
 // --- CONFIGURAÇÃO DO FIREBASE ---
-// 🔴 🔴 🔴 SUBSTITUA COM SUAS CHAVES AQUI SE NECESSÁRIO 🔴 🔴 🔴
-const manualConfig = {
+// Configuração direta para evitar erros de "variável não definida" no Vercel
+const firebaseConfig = {
   apiKey: "AIzaSyC47npvRo_nBky0R6J-27eMc4h4KZLAjqw",
   authDomain: "assados-familia-davanzo.firebaseapp.com",
   projectId: "assados-familia-davanzo",
@@ -37,14 +37,10 @@ const manualConfig = {
   measurementId: "G-Q240S9258G"
 };
 
-// Inicialização segura
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : manualConfig;
+// Inicialização
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// ID do App para separar dados
-const APP_ID = 'assados-davanzo-prod'; 
 
 // --- FUNÇÕES AUXILIARES ---
 const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -776,3 +772,5 @@ const App = () => {
     </div>
   );
 };
+
+export default App;
