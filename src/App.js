@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
-  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check
+  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check,
+  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -477,6 +478,9 @@ const AdminApp = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   
+  // Dashboard State
+  const [filterPeriod, setFilterPeriod] = useState('today'); // 'today', '7days', '30days', 'all'
+  
   // Estado para cadastro de Entregador
   const [newDriver, setNewDriver] = useState({ email: '', pass: '' });
 
@@ -502,6 +506,60 @@ const AdminApp = () => {
     return () => { unsubProducts(); unsubOrders(); };
   }, [isAuthenticated]);
 
+  // --- LÓGICA DO DASHBOARD ---
+  const dashboardData = useMemo(() => {
+    const now = new Date();
+    const filteredOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      if (filterPeriod === 'today') {
+        return orderDate.getDate() === now.getDate() && orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+      } else if (filterPeriod === 'yesterday') {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        return orderDate.getDate() === yesterday.getDate() && orderDate.getMonth() === yesterday.getMonth() && orderDate.getFullYear() === yesterday.getFullYear();
+      } else if (filterPeriod === '7days') {
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return orderDate >= sevenDaysAgo;
+      } else if (filterPeriod === '30days') {
+        const thirtyDaysAgo = new Date(now);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return orderDate >= thirtyDaysAgo;
+      }
+      return true; // 'all'
+    });
+
+    const activeOrders = filteredOrders.filter(o => o.status !== 'cancelado');
+    
+    // KPIs Básicos
+    const totalSales = activeOrders.reduce((acc, o) => acc + (o.total || 0), 0);
+    const totalOrders = activeOrders.length;
+    const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+    // Top Produtos
+    const productCount = {};
+    activeOrders.forEach(o => {
+      o.items?.forEach(i => {
+        productCount[i.name] = (productCount[i.name] || 0) + i.qty;
+      });
+    });
+    const topProducts = Object.entries(productCount)
+      .map(([name, qty]) => ({ name, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
+    // Formas de Pagamento
+    const paymentMethods = {};
+    activeOrders.forEach(o => {
+      const method = o.paymentMethod || 'Outros';
+      paymentMethods[method] = (paymentMethods[method] || 0) + 1;
+    });
+    const sortedPayments = Object.entries(paymentMethods).sort((a,b) => b[1] - a[1]);
+
+    return { totalSales, totalOrders, avgTicket, topProducts, sortedPayments, filteredCount: filteredOrders.length };
+  }, [orders, filterPeriod]);
+
+  // --- FUNÇÕES DE CRUD ---
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -537,43 +595,32 @@ const AdminApp = () => {
     await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status });
   };
 
-  // --- Função para Cadastrar Entregador (Sem deslogar o Admin) ---
   const handleRegisterDriver = async (e) => {
     e.preventDefault();
     if (!newDriver.email || !newDriver.pass) return alert("Preencha todos os campos.");
-    
-    // TRUQUE: Cria uma segunda instância do App Firebase para não deslogar o admin principal
     const secondaryApp = initializeApp(firebaseConfig, "Secondary");
     const secondaryAuth = getAuth(secondaryApp);
-
     try {
       await createUserWithEmailAndPassword(secondaryAuth, newDriver.email, newDriver.pass);
       alert(`Entregador ${newDriver.email} cadastrado com sucesso!`);
       setNewDriver({ email: '', pass: '' });
-      await signOut(secondaryAuth); // Desloga da instância secundária
-      deleteApp(secondaryApp); // Limpa a instância
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao cadastrar: " + error.message);
-    }
+      await signOut(secondaryAuth); 
+      deleteApp(secondaryApp);
+    } catch (error) { console.error(error); alert("Erro ao cadastrar: " + error.message); }
   };
 
   if (!isAuthenticated) return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
 
-  const stats = {
-    sales: orders.reduce((acc, o) => acc + (o.total || 0), 0),
-    count: orders.length,
-    pending: orders.filter(o => ['pendente', 'preparando'].includes(o.status)).length,
-    delivery: orders.filter(o => o.status === 'em_entrega').length
-  };
+  // Status globais para badges (sempre totais)
+  const pendingOrdersCount = orders.filter(o => ['pendente', 'preparando'].includes(o.status)).length;
 
   return (
     <div className="flex h-screen bg-stone-100 font-sans overflow-hidden">
       <aside className="w-64 bg-stone-900 text-stone-400 flex flex-col hidden md:flex">
         <div className="p-6 border-b border-stone-800 flex items-center gap-3 text-white"><ChefHat className="text-orange-500" /><span className="font-bold font-serif text-lg">Admin Panel</span></div>
         <nav className="flex-1 p-4 space-y-2">
-          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'dashboard' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><LayoutDashboard size={20}/> Visão Geral</button>
-          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'orders' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Package size={20}/> Pedidos (KDS) {stats.pending > 0 && <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{stats.pending}</span>}</button>
+          <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'dashboard' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><LayoutDashboard size={20}/> Painel de Controle</button>
+          <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'orders' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Package size={20}/> Pedidos {pendingOrdersCount > 0 && <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-auto">{pendingOrdersCount}</span>}</button>
           <button onClick={() => setActiveTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'menu' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Menu size={20}/> Cardápio</button>
           <button onClick={() => setActiveTab('driver')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'driver' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Bike size={20}/> Entregas</button>
         </nav>
@@ -582,20 +629,118 @@ const AdminApp = () => {
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-stone-900 text-stone-400 p-2 flex justify-around z-50 border-t border-stone-800">
          <button onClick={() => setActiveTab('dashboard')} className={`p-2 rounded-md ${activeTab === 'dashboard' ? 'text-orange-500 bg-stone-800' : ''}`}><LayoutDashboard size={24}/></button>
-         <button onClick={() => setActiveTab('orders')} className={`p-2 rounded-md relative ${activeTab === 'orders' ? 'text-orange-500 bg-stone-800' : ''}`}><Package size={24}/>{stats.pending > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-stone-900"></span>}</button>
+         <button onClick={() => setActiveTab('orders')} className={`p-2 rounded-md relative ${activeTab === 'orders' ? 'text-orange-500 bg-stone-800' : ''}`}><Package size={24}/>{pendingOrdersCount > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-stone-900"></span>}</button>
          <button onClick={() => setActiveTab('menu')} className={`p-2 rounded-md ${activeTab === 'menu' ? 'text-orange-500 bg-stone-800' : ''}`}><Menu size={24}/></button>
          <button onClick={() => setActiveTab('driver')} className={`p-2 rounded-md ${activeTab === 'driver' ? 'text-orange-500 bg-stone-800' : ''}`}><Bike size={24}/></button>
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
         {activeTab === 'dashboard' && (
-          <div className="space-y-6 animate-in fade-in">
-            <h1 className="text-2xl font-bold text-stone-800 font-serif">Dashboard</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">Vendas Hoje</h3><p className="text-3xl font-bold text-stone-800 mt-2">{formatCurrency(stats.sales)}</p></div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">Pedidos</h3><p className="text-3xl font-bold text-stone-800 mt-2">{stats.count}</p></div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">Pendentes</h3><p className="text-3xl font-bold text-yellow-600 mt-2">{stats.pending}</p></div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200"><h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider">Em Rota</h3><p className="text-3xl font-bold text-purple-600 mt-2">{stats.delivery}</p></div>
+          <div className="space-y-8 animate-in fade-in">
+            {/* CABEÇALHO E FILTROS */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+               <div>
+                  <h1 className="text-2xl font-bold text-stone-800 font-serif">Painel de Controle</h1>
+                  <p className="text-stone-500 text-sm">Visão geral do desempenho do seu negócio</p>
+               </div>
+               <div className="flex bg-white p-1 rounded-lg border border-stone-200 shadow-sm">
+                  {['today', 'yesterday', '7days', '30days', 'all'].map((period) => (
+                     <button
+                        key={period}
+                        onClick={() => setFilterPeriod(period)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${filterPeriod === period ? 'bg-stone-800 text-white shadow-sm' : 'text-stone-500 hover:bg-stone-100'}`}
+                     >
+                        {period === 'today' ? 'Hoje' : period === 'yesterday' ? 'Ontem' : period === '7days' ? '7 Dias' : period === '30days' ? '30 Dias' : 'Total'}
+                     </button>
+                  ))}
+               </div>
+            </div>
+
+            {/* KPIs PRINCIPAIS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col justify-between h-32 relative overflow-hidden group">
+                 <div className="flex justify-between items-start z-10">
+                    <div>
+                       <span className="text-stone-500 text-xs font-bold uppercase tracking-wider block mb-1">Faturamento</span>
+                       <span className="text-3xl font-bold text-stone-800">{formatCurrency(dashboardData.totalSales)}</span>
+                    </div>
+                    <div className="bg-green-100 p-2 rounded-lg text-green-700"><DollarSign size={20}/></div>
+                 </div>
+                 <div className="absolute right-0 bottom-0 opacity-10 group-hover:opacity-20 transition-opacity"><TrendingUp size={80} /></div>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col justify-between h-32 relative overflow-hidden group">
+                 <div className="flex justify-between items-start z-10">
+                    <div>
+                       <span className="text-stone-500 text-xs font-bold uppercase tracking-wider block mb-1">Pedidos Realizados</span>
+                       <span className="text-3xl font-bold text-stone-800">{dashboardData.totalOrders}</span>
+                    </div>
+                    <div className="bg-blue-100 p-2 rounded-lg text-blue-700"><ShoppingBag size={20}/></div>
+                 </div>
+                 <div className="absolute right-0 bottom-0 opacity-10 group-hover:opacity-20 transition-opacity"><Package size={80} /></div>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200 flex flex-col justify-between h-32 relative overflow-hidden group">
+                 <div className="flex justify-between items-start z-10">
+                    <div>
+                       <span className="text-stone-500 text-xs font-bold uppercase tracking-wider block mb-1">Ticket Médio</span>
+                       <span className="text-3xl font-bold text-stone-800">{formatCurrency(dashboardData.avgTicket)}</span>
+                    </div>
+                    <div className="bg-orange-100 p-2 rounded-lg text-orange-700"><BarChart3 size={20}/></div>
+                 </div>
+                 <div className="absolute right-0 bottom-0 opacity-10 group-hover:opacity-20 transition-opacity"><PieChart size={80} /></div>
+              </div>
+            </div>
+
+            {/* GRÁFICOS E LISTAS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               
+               {/* PRODUTOS MAIS VENDIDOS */}
+               <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                  <h3 className="font-bold text-stone-800 mb-6 flex items-center gap-2"><ChefHat size={18} className="text-orange-600"/> Produtos Mais Vendidos</h3>
+                  {dashboardData.topProducts.length > 0 ? (
+                     <div className="space-y-4">
+                        {dashboardData.topProducts.map((prod, idx) => (
+                           <div key={idx} className="relative">
+                              <div className="flex justify-between text-xs font-bold text-stone-600 mb-1">
+                                 <span>{prod.name}</span>
+                                 <span>{prod.qty} un</span>
+                              </div>
+                              <div className="w-full bg-stone-100 rounded-full h-2.5 overflow-hidden">
+                                 <div className="bg-stone-800 h-2.5 rounded-full" style={{ width: `${(prod.qty / dashboardData.topProducts[0].qty) * 100}%` }}></div>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  ) : (
+                     <p className="text-center text-stone-400 text-sm py-10 italic">Sem dados de vendas no período.</p>
+                  )}
+               </div>
+
+               {/* FORMAS DE PAGAMENTO */}
+               <div className="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                  <h3 className="font-bold text-stone-800 mb-6 flex items-center gap-2"><CreditCard size={18} className="text-blue-600"/> Formas de Pagamento</h3>
+                  {dashboardData.sortedPayments.length > 0 ? (
+                     <div className="space-y-4">
+                        {dashboardData.sortedPayments.map(([method, count], idx) => (
+                           <div key={idx} className="flex items-center gap-4">
+                              <div className="w-8 h-8 rounded-full bg-stone-50 flex items-center justify-center text-stone-600 text-xs font-bold">{idx + 1}</div>
+                              <div className="flex-1">
+                                 <div className="flex justify-between text-xs font-bold text-stone-600 mb-1">
+                                    <span>{method}</span>
+                                    <span>{count} pedidos</span>
+                                 </div>
+                                 <div className="w-full bg-stone-100 rounded-full h-2">
+                                    <div className={`h-2 rounded-full ${method === 'Pix' ? 'bg-green-500' : method.includes('Cartão') ? 'bg-blue-500' : 'bg-orange-500'}`} style={{ width: `${(count / dashboardData.totalOrders) * 100}%` }}></div>
+                                 </div>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  ) : (
+                     <p className="text-center text-stone-400 text-sm py-10 italic">Sem dados de pagamento no período.</p>
+                  )}
+               </div>
             </div>
           </div>
         )}
@@ -811,116 +956,6 @@ const AdminApp = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// ==========================================
-// 3. MÓDULO DO ENTREGADOR (DRIVER APP)
-// ==========================================
-
-const DriverApp = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  const [orders, setOrders] = useState([]);
-
-  // Auth Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      // Entregador também precisa ser usuário real (e-mail/senha)
-      if (currentUser && !currentUser.isAnonymous) {
-        setUser(currentUser);
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Fetch Orders
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const unsubOrders = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), (snap) => {
-      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setOrders(items);
-    });
-    return () => unsubOrders();
-  }, [isAuthenticated]);
-
-  const updateOrderStatus = async (id, status, extraData = {}) => {
-    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status, ...extraData });
-  };
-
-  if (!isAuthenticated) return <LoginScreen title="Área do Entregador" onLogin={() => setIsAuthenticated(true)} />;
-
-  return (
-    <div className="min-h-screen bg-stone-100 font-sans pb-20">
-      <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-lg">
-        <h2 className="font-bold text-lg flex gap-2 items-center"><Bike className="text-green-500" /> Entregas</h2>
-        <div className="flex items-center gap-3">
-           <span className="text-xs text-stone-400 hidden sm:inline">{user?.email}</span>
-           <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20} /></button>
-        </div>
-      </header>
-
-      <main className="p-4 space-y-6">
-        
-        {/* DISPONÍVEIS PARA PEGAR */}
-        <div>
-          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-green-500">Prontos na Cozinha</h3>
-          <div className="space-y-3">
-            {orders.filter(o => o.status === 'pronto').map(order => (
-              <div key={order.id} className="bg-white p-4 rounded-md shadow-sm border border-stone-200 animate-in slide-in-from-left duration-300">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-xl">{order.customer}</span>
-                  <span className="bg-stone-100 text-stone-500 text-xs px-2 py-1 rounded font-mono">#{order.id.slice(0,4)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4 bg-stone-50 p-2 rounded">
-                  <MapPin size={16} className="shrink-0"/> {order.address}
-                </div>
-                {/* Ao clicar, salva o email do entregador no pedido */}
-                <button onClick={() => updateOrderStatus(order.id, 'em_entrega', { driverEmail: user.email })} className="w-full py-3 bg-stone-900 text-white font-bold rounded shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
-                  <Bike size={20}/> INICIAR ROTA
-                </button>
-              </div>
-            ))}
-            {orders.filter(o => o.status === 'pronto').length === 0 && (
-              <p className="text-center text-stone-400 text-sm py-4 italic">Nenhum pedido aguardando.</p>
-            )}
-          </div>
-        </div>
-
-        {/* EM ANDAMENTO */}
-        <div>
-          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-purple-500">Minhas Entregas em Curso</h3>
-          <div className="space-y-3">
-            {/* Filtra apenas os pedidos que estão em entrega E que foram pegos por ESTE usuário */}
-            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).map(order => (
-              <div key={order.id} className="bg-white p-4 rounded-md shadow-md border-l-4 border-purple-600 animate-in zoom-in duration-300">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-xl">{order.customer}</span>
-                  <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4">
-                  <MapPin size={16} className="shrink-0"/> {order.address}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button className="py-3 bg-stone-100 text-stone-700 font-bold rounded text-xs hover:bg-stone-200">MAPA</button>
-                  <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-3 bg-green-600 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform">
-                    <CheckCircle size={16}/> ENTREGUE
-                  </button>
-                </div>
-              </div>
-            ))}
-            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).length === 0 && (
-              <p className="text-center text-stone-400 text-sm py-4 italic">Você não tem entregas ativas.</p>
-            )}
-          </div>
-        </div>
-
-      </main>
     </div>
   );
 };
