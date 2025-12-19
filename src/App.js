@@ -650,41 +650,93 @@ const AdminApp = () => {
             <h1 className="text-2xl font-bold text-stone-800 font-serif">Gestão de Entregas</h1>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* COLUNA 1: PEDIDOS EM ROTA (Com Entregador) */}
-              <div className="lg:col-span-2">
-                <h3 className="font-bold text-stone-500 uppercase text-xs mb-4 flex items-center gap-2"><Bike size={16}/> Entregas em Curso</h3>
-                <div className="space-y-4">
-                  {orders.filter(o => o.status === 'em_entrega').map(order => (
-                    <div key={order.id} className="bg-white p-4 rounded-lg border-l-4 border-purple-600 shadow-sm flex flex-col gap-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                           <span className="font-bold text-lg block">{order.customer}</span>
-                           <span className="text-xs text-stone-400 font-mono">#{order.id.slice(0,4)}</span>
+              
+              {/* COLUNA ESQUERDA: MONITORAMENTO (Expandida) */}
+              <div className="lg:col-span-2 space-y-8">
+                
+                {/* 1. AGUARDANDO RETIRADA (NOVO) */}
+                <div>
+                   <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-yellow-500 flex items-center gap-2">
+                     <Package size={16}/> Aguardando Retirada (Cozinha Finalizou)
+                   </h3>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     {orders.filter(o => o.status === 'pronto').map(order => (
+                        <div key={order.id} className="bg-white p-4 rounded-lg border border-stone-200 shadow-sm opacity-90 hover:opacity-100 transition-opacity">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <span className="font-bold text-stone-800 block">{order.customer}</span>
+                                    <span className="text-xs text-stone-400">{order.items.length} itens</span>
+                                </div>
+                                <span className="font-mono text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold">#{order.id.slice(0,4)}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-stone-500 mt-2 truncate">
+                                <MapPin size={12}/> {order.address}
+                            </div>
+                            <div className="mt-3 text-xs font-bold text-yellow-600 flex items-center gap-1 bg-yellow-50 p-2 rounded">
+                                <Clock size={12}/> Aguardando Motoboy
+                            </div>
                         </div>
-                        <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
+                     ))}
+                     {orders.filter(o => o.status === 'pronto').length === 0 && (
+                        <div className="col-span-2 bg-stone-50 p-4 rounded border border-dashed border-stone-300 text-center text-stone-400 text-sm italic">
+                            Nenhum pedido aguardando retirada no momento.
+                        </div>
+                     )}
+                   </div>
+                </div>
+
+                {/* 2. ENTREGAS EM CURSO (JÁ EXISTIA, APENAS MANTENDO E AJUSTANDO) */}
+                <div>
+                  <h3 className="font-bold text-stone-500 uppercase text-xs mb-4 pl-1 border-l-4 border-purple-600 flex items-center gap-2">
+                    <Bike size={16}/> Entregas em Curso (Na Rua)
+                  </h3>
+                  <div className="space-y-4">
+                    {orders.filter(o => o.status === 'em_entrega').map(order => (
+                      <div key={order.id} className="bg-white p-4 rounded-lg border-l-4 border-purple-600 shadow-sm flex flex-col gap-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                              <span className="font-bold text-lg block">{order.customer}</span>
+                              <span className="text-xs text-stone-400 font-mono">#{order.id.slice(0,4)}</span>
+                          </div>
+                          <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
+                        </div>
+                        
+                        <div className="bg-stone-50 p-3 rounded text-sm text-stone-600">
+                          <div className="flex items-center gap-2 mb-1"><MapPin size={16} className="shrink-0 text-stone-400"/> {order.address}</div>
+                          {order.driverEmail ? (
+                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-stone-200 text-purple-700 font-bold">
+                                <Users size={16}/> Entregador: {order.driverEmail}
+                              </div>
+                          ) : (
+                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-stone-200 text-stone-400 italic">
+                                <Users size={16}/> Entregador não identificado
+                              </div>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded font-bold text-xs text-center flex items-center justify-center gap-2"
+                            >
+                                <MapPin size={14}/> VER MAPA
+                            </a>
+                            <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-xs flex justify-center items-center gap-1">
+                                <CheckCircle size={14}/> FINALIZAR
+                            </button>
+                        </div>
                       </div>
-                      
-                      <div className="bg-stone-50 p-3 rounded text-sm text-stone-600">
-                        <div className="flex items-center gap-2 mb-1"><MapPin size={16} className="shrink-0 text-stone-400"/> {order.address}</div>
-                        {order.driverEmail && (
-                           <div className="flex items-center gap-2 mt-2 pt-2 border-t border-stone-200 text-purple-700 font-bold">
-                              <Users size={16}/> Entregador: {order.driverEmail}
-                           </div>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                         <button className="py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded font-bold text-xs">VER MAPA</button>
-                         <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold text-xs flex justify-center items-center gap-1"><CheckCircle size={14}/> FINALIZAR</button>
-                      </div>
-                    </div>
-                  ))}
-                  {orders.filter(o => o.status === 'em_entrega').length === 0 && <p className="text-stone-400 text-sm italic">Nenhuma entrega em andamento.</p>}
+                    ))}
+                    {orders.filter(o => o.status === 'em_entrega').length === 0 && <p className="text-stone-400 text-sm italic bg-stone-50 p-4 rounded border border-dashed border-stone-300 text-center">Nenhuma entrega em andamento.</p>}
+                  </div>
                 </div>
               </div>
 
-              {/* COLUNA 2: CADASTRAR ENTREGADOR */}
-              <div>
+              {/* COLUNA DIREITA: CADASTRO + HISTÓRICO */}
+              <div className="space-y-8">
+                 {/* CADASTRO ENTREGADOR (EXISTENTE) */}
                  <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200 sticky top-4">
                     <h3 className="font-bold text-stone-800 uppercase text-sm mb-4 flex items-center gap-2"><UserPlus size={18} className="text-orange-600"/> Novo Entregador</h3>
                     <form onSubmit={handleRegisterDriver} className="space-y-4">
@@ -713,6 +765,24 @@ const AdminApp = () => {
                     <p className="mt-4 text-xs text-stone-400 leading-relaxed border-t pt-3">
                        * O entregador usará este e-mail e senha para acessar o painel de entregas.
                     </p>
+                 </div>
+
+                 {/* ÚLTIMAS ENTREGAS (NOVO) */}
+                 <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200">
+                    <h3 className="font-bold text-stone-800 uppercase text-sm mb-4 flex items-center gap-2"><CheckCircle size={18} className="text-green-600"/> Últimas Finalizadas</h3>
+                    <div className="space-y-3">
+                        {orders.filter(o => o.status === 'entregue').slice(0, 5).map(order => (
+                            <div key={order.id} className="text-xs border-b border-stone-100 pb-2 last:border-0">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-stone-700 truncate w-24">{order.customer}</span>
+                                    <span className="text-stone-400">{order.id.slice(0,4)}</span>
+                                </div>
+                                {order.driverEmail && <p className="text-stone-500 truncate mb-1">Ent: {order.driverEmail.split('@')[0]}</p>}
+                                <span className="text-green-600 font-bold flex items-center gap-1"><Check size={10}/> Entregue</span>
+                            </div>
+                        ))}
+                        {orders.filter(o => o.status === 'entregue').length === 0 && <p className="text-xs text-stone-400 italic">Nenhuma entrega finalizada.</p>}
+                    </div>
                  </div>
               </div>
             </div>
