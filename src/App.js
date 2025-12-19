@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
-  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users
+  Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -22,7 +22,8 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot 
+  onSnapshot,
+  getDoc 
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -126,6 +127,90 @@ const CustomerLanding = ({ onStart }) => (
   </div>
 );
 
+// --- NOVO COMPONENTE: RASTREAMENTO DE PEDIDO ---
+const OrderTracker = ({ orderId, onBack }) => {
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!orderId) return;
+    const unsub = onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId), (doc) => {
+      if (doc.exists()) {
+        setOrder({ id: doc.id, ...doc.data() });
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [orderId]);
+
+  if (loading) return <div className="flex h-screen items-center justify-center"><Loader className="animate-spin text-orange-800" /></div>;
+  if (!order) return <div className="p-8 text-center">Pedido não encontrado. <button onClick={onBack} className="text-blue-600 underline">Voltar</button></div>;
+
+  const steps = [
+    { status: 'pendente', label: 'Recebido', desc: 'Aguardando confirmação', icon: Store },
+    { status: 'preparando', label: 'Preparando', desc: 'Sendo preparado com carinho', icon: ChefHat },
+    { status: 'pronto', label: 'Pronto', desc: 'Aguardando entregador/retirada', icon: Package },
+    { status: 'em_entrega', label: 'Em Rota', desc: 'Saiu para entrega', icon: Bike },
+    { status: 'entregue', label: 'Entregue', desc: 'Pedido finalizado', icon: CheckCircle },
+  ];
+
+  const currentStepIndex = steps.findIndex(s => s.status === order.status);
+
+  return (
+    <div className="min-h-screen bg-stone-50 pb-20 font-sans">
+      <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 shadow-lg flex items-center gap-3">
+        <button onClick={onBack}><ArrowRight className="rotate-180" /></button>
+        <h1 className="font-bold text-lg">Acompanhar Pedido</h1>
+      </header>
+
+      <main className="max-w-md mx-auto p-6 space-y-6">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-stone-200 text-center">
+          <h2 className="text-2xl font-bold text-stone-800 mb-1">#{order.id.slice(0, 4).toUpperCase()}</h2>
+          <p className="text-stone-500 text-sm">Previsão: 40-60 min</p>
+        </div>
+
+        <div className="space-y-6 relative">
+            <div className="absolute left-6 top-4 bottom-4 w-0.5 bg-stone-200" />
+            {steps.map((step, index) => {
+                const isCompleted = index <= currentStepIndex;
+                const isCurrent = index === currentStepIndex;
+                const Icon = step.icon;
+
+                return (
+                    <div key={step.status} className={`relative flex gap-4 ${index > currentStepIndex ? 'opacity-50' : 'opacity-100'} transition-all duration-500`}>
+                        <div className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isCompleted ? 'bg-green-600 border-green-100 text-white shadow-lg scale-110' : 'bg-white border-stone-200 text-stone-300'}`}>
+                            {isCompleted ? <Icon size={20} /> : <span className="text-xs font-bold">{index + 1}</span>}
+                        </div>
+                        <div className="pt-1 flex-1">
+                            <h3 className={`font-bold text-lg ${isCurrent ? 'text-green-700' : 'text-stone-800'}`}>{step.label}</h3>
+                            <p className="text-xs text-stone-500">{step.desc}</p>
+                        </div>
+                        {isCurrent && <div className="absolute right-0 top-3 w-3 h-3 bg-green-500 rounded-full animate-ping" />}
+                    </div>
+                )
+            })}
+        </div>
+
+        <div className="bg-white p-4 rounded-lg border border-stone-200 mt-8">
+            <h3 className="font-bold text-stone-800 border-b pb-2 mb-2">Resumo</h3>
+            {order.items.map((item, i) => (
+                <div key={i} className="flex justify-between text-sm py-1">
+                    <span>{item.qty}x {item.name}</span>
+                    <span className="font-mono">{formatCurrency(item.price * item.qty)}</span>
+                </div>
+            ))}
+            <div className="flex justify-between font-bold text-lg mt-3 pt-3 border-t">
+                <span>Total</span>
+                <span>{formatCurrency(order.total)}</span>
+            </div>
+        </div>
+        
+        <button onClick={onBack} className="w-full py-4 bg-stone-800 text-white font-bold rounded-lg shadow-lg">VOLTAR AO CARDÁPIO</button>
+      </main>
+    </div>
+  );
+};
+
 const CustomerApp = () => {
   const [view, setView] = useState('landing');
   const [products, setProducts] = useState([]);
@@ -133,6 +218,9 @@ const CustomerApp = () => {
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '', paymentMethod: 'Pix' });
+  
+  // NOVO ESTADO: RASTREAMENTO
+  const [trackOrderId, setTrackOrderId] = useState(null);
 
   // Auth Anônima
   useEffect(() => {
@@ -198,7 +286,9 @@ const CustomerApp = () => {
         createdAt: new Date().toISOString(),
         time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       };
+      
       const docRef = await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), orderData);
+      
       let message = `*NOVO PEDIDO #${docRef.id.slice(0, 4).toUpperCase()} - FAMILIA DAVANZO*\n\n`;
       message += `*Cliente:* ${checkoutForm.name}\n`;
       message += `*Endereço:* ${checkoutForm.address}\n`;
@@ -208,10 +298,16 @@ const CustomerApp = () => {
       cart.forEach(item => { message += `${item.qty}x ${item.name} - ${formatCurrency(item.price * item.qty)}\n`; });
       message += `--------------------------------\n`;
       message += `*TOTAL: ${formatCurrency(cartTotal)}*\n`;
+      
       window.open(`https://wa.me/5511999999999?text=${encodeURIComponent(message)}`, '_blank');
+      
+      // CONFIGURA O RASTREAMENTO E MUDA A TELA
       setCart([]);
       setIsCartOpen(false);
       setCheckoutForm({ name: '', whatsapp: '', address: '', notes: '', paymentMethod: 'Pix' });
+      setTrackOrderId(docRef.id);
+      setView('tracking');
+
     } catch (err) {
       console.error(err);
       alert("Erro ao processar. Tente novamente.");
@@ -219,6 +315,9 @@ const CustomerApp = () => {
   };
 
   if (view === 'landing') return <CustomerLanding onStart={() => setView('menu')} />;
+  
+  // EXIBE O RASTREADOR SE A VIEW FOR 'tracking'
+  if (view === 'tracking') return <OrderTracker orderId={trackOrderId} onBack={() => setView('menu')} />;
 
   return (
     <div className="min-h-screen bg-stone-50 pb-20 font-sans">
@@ -764,6 +863,14 @@ export default function IntegratedApp() {
   const [currentRoute, setCurrentRoute] = useState(window.location.hash);
 
   useEffect(() => {
+    // Inject Tailwind Script se necessário
+    if (!window.tailwind) {
+      const script = document.createElement('script');
+      script.src = "https://cdn.tailwindcss.com";
+      script.async = true;
+      document.head.appendChild(script);
+    }
+    
     const handleHashChange = () => setCurrentRoute(window.location.hash);
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
