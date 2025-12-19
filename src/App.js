@@ -50,7 +50,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-const APP_ID = 'assados-davanzo-prod'; 
+// Use o ID global se disponível para garantir isolamento no ambiente de teste
+const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'assados-davanzo-prod'; 
 
 // --- FUNÇÕES AUXILIARES ---
 const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -134,12 +135,13 @@ const CustomerLanding = ({ onStart }) => (
 );
 
 // --- NOVO COMPONENTE: RASTREAMENTO DE PEDIDO ---
-const OrderTracker = ({ orderId, onBack }) => {
+const OrderTracker = ({ orderId, onBack, currentUser }) => {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!orderId) return;
+    if (!orderId || !currentUser) return; // Guard clause corrigida
+    
     const unsub = onSnapshot(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId), (doc) => {
       if (doc.exists()) {
         setOrder({ id: doc.id, ...doc.data() });
@@ -147,7 +149,7 @@ const OrderTracker = ({ orderId, onBack }) => {
       setLoading(false);
     });
     return () => unsub();
-  }, [orderId]);
+  }, [orderId, currentUser]);
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader className="animate-spin text-orange-800" /></div>;
   if (!order) return <div className="p-8 text-center">Pedido não encontrado. <button onClick={onBack} className="text-blue-600 underline">Voltar</button></div>;
@@ -224,27 +226,34 @@ const CustomerApp = () => {
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [checkoutForm, setCheckoutForm] = useState({ name: '', whatsapp: '', address: '', notes: '', paymentMethod: 'Pix' });
+  const [currentUser, setCurrentUser] = useState(null); // Estado para controlar o usuário
   
   // NOVO ESTADO: RASTREAMENTO
   const [trackOrderId, setTrackOrderId] = useState(null);
 
-  // Auth Anônima
+  // Auth Anônima com State Management
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) signInAnonymously(auth).catch((err) => console.error(err));
+      if (user) {
+        setCurrentUser(user);
+      } else {
+        signInAnonymously(auth).catch((err) => console.error(err));
+      }
     });
     return () => unsubscribe();
   }, []);
 
-  // Carregar Produtos
+  // Carregar Produtos (Somente após autenticação)
   useEffect(() => {
+    if (!currentUser) return; // GUARDA DE SEGURANÇA
+    
     const productsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'products');
     const unsubscribe = onSnapshot(productsRef, (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProducts(items);
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]); // Depende do currentUser
 
   const categories = ['Todos', ...new Set(products.map(p => p.category))];
   const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => p.category === activeCategory);
@@ -279,6 +288,11 @@ const CustomerApp = () => {
       alert("Preencha os campos obrigatórios.");
       return;
     }
+    if (!currentUser) {
+        alert("Aguarde a conexão com o servidor...");
+        return;
+    }
+
     try {
       const orderData = {
         customer: checkoutForm.name,
@@ -323,7 +337,7 @@ const CustomerApp = () => {
   if (view === 'landing') return <CustomerLanding onStart={() => setView('menu')} />;
   
   // EXIBE O RASTREADOR SE A VIEW FOR 'tracking'
-  if (view === 'tracking') return <OrderTracker orderId={trackOrderId} onBack={() => setView('menu')} />;
+  if (view === 'tracking') return <OrderTracker orderId={trackOrderId} onBack={() => setView('menu')} currentUser={currentUser} />;
 
   return (
     <div className="min-h-screen bg-stone-50 pb-20 font-sans">
@@ -346,7 +360,10 @@ const CustomerApp = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {products.length === 0 && <div className="flex flex-col items-center justify-center mt-20 text-stone-400"><ChefHat size={48} className="mb-4 opacity-20"/><p>Carregando as delícias...</p></div>}
+        {!currentUser && <div className="flex flex-col items-center justify-center mt-20 text-stone-400"><Loader className="animate-spin mb-4" size={48}/><p>Conectando...</p></div>}
+        
+        {currentUser && products.length === 0 && <div className="flex flex-col items-center justify-center mt-20 text-stone-400"><ChefHat size={48} className="mb-4 opacity-20"/><p>Carregando as delícias...</p></div>}
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map(product => (
             <div key={product.id} className="bg-white rounded-lg shadow-sm border border-stone-200 overflow-hidden flex flex-col group hover:shadow-xl transition-shadow duration-300">
