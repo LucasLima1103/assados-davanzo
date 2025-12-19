@@ -496,6 +496,7 @@ const AdminApp = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      // Se existe usuário E ele não é anônimo (cliente), então é autenticado
       if (currentUser && !currentUser.isAnonymous) {
         setIsAuthenticated(true);
       } else {
@@ -662,7 +663,10 @@ const AdminApp = () => {
     } catch (error) { console.error(error); alert("Erro ao cadastrar: " + error.message); }
   };
 
-  if (!isAuthenticated) return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
+  // --- SEGURANÇA: Se não autenticado, mostra Login ---
+  if (!isAuthenticated) {
+      return <LoginScreen onLogin={() => setIsAuthenticated(true)} />;
+  }
 
   // Status globais para badges (sempre totais)
   const pendingOrdersCount = orders.filter(o => ['pendente', 'preparando'].includes(o.status)).length;
@@ -678,7 +682,7 @@ const AdminApp = () => {
           <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'inventory' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Box size={20}/> Estoque</button>
           <button onClick={() => setActiveTab('driver')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'driver' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Bike size={20}/> Entregas</button>
         </nav>
-        <div className="p-4 border-t border-stone-800"><button onClick={() => signOut(auth)} className="flex items-center gap-2 hover:text-white transition-colors"><ArrowRight className="rotate-180"/> Sair</button></div>
+        <div className="p-4 border-t border-stone-800"><button onClick={() => signOut(auth)} className="flex items-center gap-2 hover:text-white transition-colors"><LogOut className="rotate-0"/> Sair</button></div>
       </aside>
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-stone-900 text-stone-400 p-2 flex justify-around z-50 border-t border-stone-800">
@@ -1207,6 +1211,7 @@ const DriverApp = () => {
   // Monitorar Auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
+      // Mesma lógica do Admin: só permite usuários não-anônimos
       if (currentUser && !currentUser.isAnonymous) setUser(currentUser);
       else setUser(null);
     });
@@ -1241,7 +1246,10 @@ const DriverApp = () => {
     });
   };
 
-  if (!user) return <LoginScreen title="App do Entregador" onLogin={() => {}} />;
+  // --- SEGURANÇA: Se não autenticado, mostra Login ---
+  if (!user) {
+      return <LoginScreen title="App do Entregador" onLogin={() => {}} />;
+  }
 
   const myDeliveries = orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email);
   const availableOrders = orders.filter(o => o.status === 'pronto');
