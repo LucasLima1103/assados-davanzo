@@ -3,7 +3,7 @@ import {
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
   Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check,
-  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search
+  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search, History
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -492,7 +492,7 @@ const AdminApp = () => {
   // ESTADOS DO ESTOQUE
   const [inventory, setInventory] = useState([]);
   const [isInventoryFormOpen, setIsInventoryFormOpen] = useState(false);
-  const [inventoryItem, setInventoryItem] = useState({ name: '', category: 'Ingredientes', quantity: '', unit: 'un' });
+  const [inventoryItem, setInventoryItem] = useState({ name: '', category: 'Ingredientes', quantity: '', unit: 'un', cost: '' });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -614,27 +614,41 @@ const AdminApp = () => {
     // Procura se já existe um item com esse nome (case insensitive)
     const existingItem = inventory.find(i => i.name.toLowerCase() === inventoryItem.name.toLowerCase());
     
+    // Cria o objeto de histórico da entrada atual
+    const newEntry = {
+        date: new Date().toISOString(),
+        qty: parseFloat(inventoryItem.quantity),
+        cost: inventoryItem.cost ? parseFloat(inventoryItem.cost) : 0,
+        unit: inventoryItem.unit
+    };
+
     try {
         if (existingItem) {
-            // Se existe, atualiza a quantidade mantendo o SKU
+            // Se existe, atualiza a quantidade e adiciona ao histórico
+            // Nota: Estamos lendo o histórico do objeto existente em memória. Em app real de alto volume usaríamos arrayUnion.
+            const updatedHistory = [...(existingItem.history || []), newEntry];
+            
             await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'inventory', existingItem.id), {
-                quantity: parseFloat(existingItem.quantity) + parseFloat(inventoryItem.quantity)
+                quantity: parseFloat(existingItem.quantity) + parseFloat(inventoryItem.quantity),
+                history: updatedHistory,
+                updatedAt: new Date().toISOString()
             });
-            alert(`Item "${existingItem.name}" já existia (SKU ${existingItem.sku}). Estoque atualizado!`);
+            alert(`Item "${existingItem.name}" atualizado! Estoque somado.`);
         } else {
-            // Se não existe, cria novo com SKU aleatório
+            // Se não existe, cria novo com histórico inicial
             const newItem = {
                 sku: generateSKU(),
                 name: inventoryItem.name,
                 category: inventoryItem.category,
                 quantity: parseFloat(inventoryItem.quantity),
                 unit: inventoryItem.unit,
+                history: [newEntry],
                 updatedAt: new Date().toISOString()
             };
             await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'inventory'), newItem);
         }
         setIsInventoryFormOpen(false);
-        setInventoryItem({ name: '', category: 'Ingredientes', quantity: '', unit: 'un' });
+        setInventoryItem({ name: '', category: 'Ingredientes', quantity: '', unit: 'un', cost: '' });
     } catch (err) {
         console.error(err);
         alert("Erro ao salvar estoque.");
@@ -926,10 +940,26 @@ const AdminApp = () => {
                                         <tr key={item.id} className="hover:bg-stone-50">
                                             <td className="p-3 font-mono text-xs text-stone-400">{item.sku}</td>
                                             <td className="p-3 font-bold text-stone-700">{item.name}</td>
-                                            <td className="p-3 text-center">
+                                            <td className="p-3 text-center relative group cursor-help">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.quantity < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                                                     {item.quantity} {item.unit}
                                                 </span>
+                                                {/* TOOLTIP DE HISTÓRICO */}
+                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-stone-800 text-white text-xs rounded p-2 z-20 shadow-xl pointer-events-none animate-in fade-in zoom-in-95 duration-200">
+                                                   <div className="font-bold border-b border-stone-600 pb-1 mb-1 flex items-center gap-2"><History size={12}/> Últimas Entradas</div>
+                                                   {item.history && item.history.length > 0 ? (
+                                                      <div className="space-y-1">
+                                                        {item.history.slice(-5).reverse().map((h, i) => (
+                                                            <div key={i} className="flex justify-between py-1 border-b border-stone-700 last:border-0 last:pb-0">
+                                                                <span className="text-stone-400">{new Date(h.date).toLocaleDateString()}</span>
+                                                                <span className="text-green-400 font-bold">+{h.qty}</span>
+                                                                <span className="text-stone-300">{formatCurrency(h.cost)}</span>
+                                                            </div>
+                                                        ))}
+                                                      </div>
+                                                   ) : <span className="text-stone-500 italic block py-1">Sem histórico registrado.</span>}
+                                                   <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-stone-800"></div>
+                                                </div>
                                             </td>
                                             <td className="p-3 text-right">
                                                 <button onClick={() => handleDeleteInventory(item.id)} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={16}/></button>
@@ -978,15 +1008,25 @@ const AdminApp = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Unidade</label>
-                                        <select className="w-full p-2 border border-stone-300 rounded text-sm bg-white" value={inventoryItem.unit} onChange={e => setInventoryItem({...inventoryItem, unit: e.target.value})}>
-                                            <option value="un">Unidade (un)</option>
-                                            <option value="kg">Quilo (kg)</option>
-                                            <option value="L">Litro (L)</option>
-                                            <option value="pct">Pacote (pct)</option>
-                                            <option value="cx">Caixa (cx)</option>
-                                        </select>
+                                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Custo Total (R$)</label>
+                                        <input 
+                                            type="number" 
+                                            className="w-full p-2 border border-stone-300 rounded text-sm" 
+                                            placeholder="0.00"
+                                            value={inventoryItem.cost} 
+                                            onChange={e => setInventoryItem({...inventoryItem, cost: e.target.value})} 
+                                        />
                                     </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Unidade</label>
+                                    <select className="w-full p-2 border border-stone-300 rounded text-sm bg-white" value={inventoryItem.unit} onChange={e => setInventoryItem({...inventoryItem, unit: e.target.value})}>
+                                        <option value="un">Unidade (un)</option>
+                                        <option value="kg">Quilo (kg)</option>
+                                        <option value="L">Litro (L)</option>
+                                        <option value="pct">Pacote (pct)</option>
+                                        <option value="cx">Caixa (cx)</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Categoria (Classe)</label>
