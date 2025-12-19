@@ -3,7 +3,7 @@ import {
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
   Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check,
-  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign
+  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -54,6 +54,10 @@ const APP_ID = 'assados-davanzo-prod';
 
 // --- FUNÇÕES AUXILIARES ---
 const formatCurrency = (value) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const generateSKU = () => {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+};
 
 const crc16ccitt = (str) => {
   let crc = 0xFFFF;
@@ -485,6 +489,11 @@ const AdminApp = () => {
   // Estado para cadastro de Entregador
   const [newDriver, setNewDriver] = useState({ email: '', pass: '' });
 
+  // ESTADOS DO ESTOQUE
+  const [inventory, setInventory] = useState([]);
+  const [isInventoryFormOpen, setIsInventoryFormOpen] = useState(false);
+  const [inventoryItem, setInventoryItem] = useState({ name: '', category: 'Ingredientes', quantity: '', unit: 'un' });
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser && !currentUser.isAnonymous) {
@@ -504,7 +513,12 @@ const AdminApp = () => {
       items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(items);
     });
-    return () => { unsubProducts(); unsubOrders(); };
+    // NOVO: Listener de Estoque
+    const unsubInventory = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'inventory'), (snap) => {
+      setInventory(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => { unsubProducts(); unsubOrders(); unsubInventory(); };
   }, [isAuthenticated]);
 
   // --- LÓGICA DO DASHBOARD ---
@@ -592,6 +606,44 @@ const AdminApp = () => {
     if(confirm("Excluir item?")) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', id));
   };
 
+  // --- FUNÇÕES DE ESTOQUE ---
+  const handleSaveInventory = async () => {
+    if (!inventoryItem.name || !inventoryItem.quantity) return alert("Preencha nome e quantidade.");
+    
+    // Procura se já existe um item com esse nome (case insensitive)
+    const existingItem = inventory.find(i => i.name.toLowerCase() === inventoryItem.name.toLowerCase());
+    
+    try {
+        if (existingItem) {
+            // Se existe, atualiza a quantidade mantendo o SKU
+            await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'inventory', existingItem.id), {
+                quantity: parseFloat(existingItem.quantity) + parseFloat(inventoryItem.quantity)
+            });
+            alert(`Item "${existingItem.name}" já existia (SKU ${existingItem.sku}). Estoque atualizado!`);
+        } else {
+            // Se não existe, cria novo com SKU aleatório
+            const newItem = {
+                sku: generateSKU(),
+                name: inventoryItem.name,
+                category: inventoryItem.category,
+                quantity: parseFloat(inventoryItem.quantity),
+                unit: inventoryItem.unit,
+                updatedAt: new Date().toISOString()
+            };
+            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'inventory'), newItem);
+        }
+        setIsInventoryFormOpen(false);
+        setInventoryItem({ name: '', category: 'Ingredientes', quantity: '', unit: 'un' });
+    } catch (err) {
+        console.error(err);
+        alert("Erro ao salvar estoque.");
+    }
+  };
+
+  const handleDeleteInventory = async (id) => {
+      if(confirm("Remover item do estoque?")) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'inventory', id));
+  };
+
   const updateOrderStatus = async (id, status) => {
     await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status });
   };
@@ -623,6 +675,7 @@ const AdminApp = () => {
           <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'dashboard' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><LayoutDashboard size={20}/> Painel de Controle</button>
           <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'orders' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Package size={20}/> Pedidos {pendingOrdersCount > 0 && <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full ml-auto">{pendingOrdersCount}</span>}</button>
           <button onClick={() => setActiveTab('menu')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'menu' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Menu size={20}/> Cardápio</button>
+          <button onClick={() => setActiveTab('inventory')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'inventory' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Box size={20}/> Estoque</button>
           <button onClick={() => setActiveTab('driver')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === 'driver' ? 'bg-orange-900 text-white' : 'hover:bg-stone-800'}`}><Bike size={20}/> Entregas</button>
         </nav>
         <div className="p-4 border-t border-stone-800"><button onClick={() => signOut(auth)} className="flex items-center gap-2 hover:text-white transition-colors"><ArrowRight className="rotate-180"/> Sair</button></div>
@@ -632,6 +685,7 @@ const AdminApp = () => {
          <button onClick={() => setActiveTab('dashboard')} className={`p-2 rounded-md ${activeTab === 'dashboard' ? 'text-orange-500 bg-stone-800' : ''}`}><LayoutDashboard size={24}/></button>
          <button onClick={() => setActiveTab('orders')} className={`p-2 rounded-md relative ${activeTab === 'orders' ? 'text-orange-500 bg-stone-800' : ''}`}><Package size={24}/>{pendingOrdersCount > 0 && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-stone-900"></span>}</button>
          <button onClick={() => setActiveTab('menu')} className={`p-2 rounded-md ${activeTab === 'menu' ? 'text-orange-500 bg-stone-800' : ''}`}><Menu size={24}/></button>
+         <button onClick={() => setActiveTab('inventory')} className={`p-2 rounded-md ${activeTab === 'inventory' ? 'text-orange-500 bg-stone-800' : ''}`}><Box size={24}/></button>
          <button onClick={() => setActiveTab('driver')} className={`p-2 rounded-md ${activeTab === 'driver' ? 'text-orange-500 bg-stone-800' : ''}`}><Bike size={24}/></button>
       </div>
 
@@ -833,6 +887,124 @@ const AdminApp = () => {
           </div>
         )}
 
+        {/* NOVA ABA: ESTOQUE */}
+        {activeTab === 'inventory' && (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-stone-800 font-serif">Controle de Estoque</h1>
+                        <p className="text-stone-500 text-sm">Gerencie ingredientes e materiais</p>
+                    </div>
+                    <button onClick={() => setIsInventoryFormOpen(true)} className="px-4 py-2 bg-stone-900 text-white rounded-md font-bold text-sm shadow-md hover:bg-stone-800 transition-colors flex items-center gap-2">
+                        <Plus size={16}/> Entrada / Cadastro
+                    </button>
+                </div>
+
+                {['Ingredientes', 'Embalagens', 'Bebidas', 'Limpeza', 'Outros'].map(category => {
+                    const items = inventory.filter(i => i.category === category);
+                    if (items.length === 0) return null;
+                    return (
+                        <div key={category} className="bg-white rounded-lg shadow-sm border border-stone-200 overflow-hidden">
+                            <h3 className="bg-stone-50 p-3 font-bold text-stone-600 uppercase text-xs border-b border-stone-200 flex items-center gap-2">
+                                <Box size={14}/> {category}
+                            </h3>
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-white text-stone-400 font-bold uppercase text-[10px] tracking-wider border-b border-stone-100">
+                                    <tr>
+                                        <th className="p-3">SKU</th>
+                                        <th className="p-3">Item</th>
+                                        <th className="p-3 text-center">Qtd. Atual</th>
+                                        <th className="p-3 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-stone-100">
+                                    {items.map(item => (
+                                        <tr key={item.id} className="hover:bg-stone-50">
+                                            <td className="p-3 font-mono text-xs text-stone-400">{item.sku}</td>
+                                            <td className="p-3 font-bold text-stone-700">{item.name}</td>
+                                            <td className="p-3 text-center">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.quantity < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                                    {item.quantity} {item.unit}
+                                                </span>
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <button onClick={() => handleDeleteInventory(item.id)} className="text-red-400 hover:text-red-600 p-1"><Trash2 size={16}/></button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                })}
+                
+                {inventory.length === 0 && (
+                    <div className="text-center py-20 text-stone-400">
+                        <Box size={48} className="mx-auto mb-4 opacity-20"/>
+                        <p>Estoque vazio. Adicione itens para começar.</p>
+                    </div>
+                )}
+
+                {/* MODAL DE ESTOQUE */}
+                {isInventoryFormOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm" onClick={() => setIsInventoryFormOpen(false)} />
+                        <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                            <h3 className="font-bold text-lg text-stone-800 border-b pb-2 flex items-center gap-2"><Box size={20}/> Entrada de Estoque</h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Nome do Produto</label>
+                                    <input 
+                                        className="w-full p-2 border border-stone-300 rounded text-sm" 
+                                        placeholder="Ex: Tomate, Carvão..."
+                                        value={inventoryItem.name} 
+                                        onChange={e => setInventoryItem({...inventoryItem, name: e.target.value})} 
+                                    />
+                                    <p className="text-[10px] text-stone-400 mt-1">Se o nome já existir, a quantidade será somada ao SKU atual.</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Quantidade</label>
+                                        <input 
+                                            type="number" 
+                                            className="w-full p-2 border border-stone-300 rounded text-sm" 
+                                            placeholder="0.00"
+                                            value={inventoryItem.quantity} 
+                                            onChange={e => setInventoryItem({...inventoryItem, quantity: e.target.value})} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Unidade</label>
+                                        <select className="w-full p-2 border border-stone-300 rounded text-sm bg-white" value={inventoryItem.unit} onChange={e => setInventoryItem({...inventoryItem, unit: e.target.value})}>
+                                            <option value="un">Unidade (un)</option>
+                                            <option value="kg">Quilo (kg)</option>
+                                            <option value="L">Litro (L)</option>
+                                            <option value="pct">Pacote (pct)</option>
+                                            <option value="cx">Caixa (cx)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-stone-500 uppercase mb-1">Categoria (Classe)</label>
+                                    <select className="w-full p-2 border border-stone-300 rounded text-sm bg-white" value={inventoryItem.category} onChange={e => setInventoryItem({...inventoryItem, category: e.target.value})}>
+                                        <option>Ingredientes</option>
+                                        <option>Embalagens</option>
+                                        <option>Bebidas</option>
+                                        <option>Limpeza</option>
+                                        <option>Outros</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button onClick={() => setIsInventoryFormOpen(false)} className="px-4 py-2 text-stone-500 font-bold text-xs hover:bg-stone-100 rounded">CANCELAR</button>
+                                <button onClick={handleSaveInventory} className="px-4 py-2 bg-stone-900 text-white font-bold text-xs rounded hover:bg-stone-800">CONFIRMAR ENTRADA</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )}
+
         {activeTab === 'menu' && (
           <div className="space-y-6 animate-in fade-in">
             <div className="flex justify-between items-center"><h1 className="text-2xl font-bold text-stone-800 font-serif">Gerenciar Cardápio</h1><button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: ''}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-md font-bold text-sm shadow-md hover:bg-stone-800 transition-colors">ADICIONAR ITEM</button></div>
@@ -1020,123 +1192,6 @@ const AdminApp = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// ==========================================
-// 3. MÓDULO DO ENTREGADOR (DRIVER APP)
-// ==========================================
-
-const DriverApp = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  const [orders, setOrders] = useState([]);
-
-  // Auth Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      // Entregador também precisa ser usuário real (e-mail/senha)
-      if (currentUser && !currentUser.isAnonymous) {
-        setUser(currentUser);
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(false);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Fetch Orders
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const unsubOrders = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), (snap) => {
-      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setOrders(items);
-    });
-    return () => unsubOrders();
-  }, [isAuthenticated]);
-
-  const updateOrderStatus = async (id, status, extraData = {}) => {
-    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status, ...extraData });
-  };
-
-  if (!isAuthenticated) return <LoginScreen title="Área do Entregador" onLogin={() => setIsAuthenticated(true)} />;
-
-  return (
-    <div className="min-h-screen bg-stone-100 font-sans pb-20">
-      <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-lg">
-        <h2 className="font-bold text-lg flex gap-2 items-center"><Bike className="text-green-500" /> Entregas</h2>
-        <div className="flex items-center gap-3">
-           <span className="text-xs text-stone-400 hidden sm:inline">{user?.email}</span>
-           <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20} /></button>
-        </div>
-      </header>
-
-      <main className="p-4 space-y-6">
-        
-        {/* DISPONÍVEIS PARA PEGAR */}
-        <div>
-          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-green-500">Prontos na Cozinha</h3>
-          <div className="space-y-3">
-            {orders.filter(o => o.status === 'pronto').map(order => (
-              <div key={order.id} className="bg-white p-4 rounded-md shadow-sm border border-stone-200 animate-in slide-in-from-left duration-300">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-xl">{order.customer}</span>
-                  <span className="bg-stone-100 text-stone-500 text-xs px-2 py-1 rounded font-mono">#{order.id.slice(0,4)}</span>
-                </div>
-                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4 bg-stone-50 p-2 rounded">
-                  <MapPin size={16} className="shrink-0"/> {order.address}
-                </div>
-                {/* Ao clicar, salva o email do entregador no pedido */}
-                <button onClick={() => updateOrderStatus(order.id, 'em_entrega', { driverEmail: user.email })} className="w-full py-3 bg-stone-900 text-white font-bold rounded shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
-                  <Bike size={20}/> INICIAR ROTA
-                </button>
-              </div>
-            ))}
-            {orders.filter(o => o.status === 'pronto').length === 0 && (
-              <p className="text-center text-stone-400 text-sm py-4 italic">Nenhum pedido aguardando.</p>
-            )}
-          </div>
-        </div>
-
-        {/* EM ANDAMENTO */}
-        <div>
-          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-purple-500">Minhas Entregas em Curso</h3>
-          <div className="space-y-3">
-            {/* Filtra apenas os pedidos que estão em entrega E que foram pegos por ESTE usuário */}
-            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).map(order => (
-              <div key={order.id} className="bg-white p-4 rounded-md shadow-md border-l-4 border-purple-600 animate-in zoom-in duration-300">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-xl">{order.customer}</span>
-                  <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
-                </div>
-                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4">
-                  <MapPin size={16} className="shrink-0"/> {order.address}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="py-3 bg-stone-100 text-stone-700 font-bold rounded text-xs hover:bg-stone-200 flex items-center justify-center gap-2"
-                  >
-                    <MapPin size={16}/> MAPA
-                  </a>
-                  <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-3 bg-green-600 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform">
-                    <CheckCircle size={16}/> ENTREGUE
-                  </button>
-                </div>
-              </div>
-            ))}
-            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).length === 0 && (
-              <p className="text-center text-stone-400 text-sm py-4 italic">Você não tem entregas ativas.</p>
-            )}
-          </div>
-        </div>
-
-      </main>
     </div>
   );
 };
