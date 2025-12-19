@@ -3,7 +3,7 @@ import {
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
   Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check,
-  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search, History
+  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search, History, AlertTriangle, AlertCircle
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -494,6 +494,10 @@ const AdminApp = () => {
   const [isInventoryFormOpen, setIsInventoryFormOpen] = useState(false);
   const [inventoryItem, setInventoryItem] = useState({ name: '', category: 'Ingredientes', quantity: '', unit: 'un', cost: '' });
 
+  // ESTADOS PARA INGREDIENTES NO PRATO
+  const [tempIngId, setTempIngId] = useState('');
+  const [tempIngQty, setTempIngQty] = useState('');
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       // Se existe usuário E ele não é anônimo (cliente), então é autenticado
@@ -594,7 +598,8 @@ const AdminApp = () => {
       price: parseFloat(editingProduct.price),
       category: editingProduct.category,
       description: editingProduct.description,
-      image: editingProduct.image || 'https://via.placeholder.com/400'
+      image: editingProduct.image || 'https://via.placeholder.com/400',
+      ingredients: editingProduct.ingredients || []
     };
     try {
       if (editingProduct.id) await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', editingProduct.id), productData);
@@ -605,6 +610,57 @@ const AdminApp = () => {
 
   const handleDeleteProduct = async (id) => {
     if(confirm("Excluir item?")) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'products', id));
+  };
+
+  // Funções de Ingredientes no Produto
+  const handleAddIngredient = () => {
+      if (!tempIngId || !tempIngQty) return;
+      const stockItem = inventory.find(i => i.id === tempIngId);
+      if (!stockItem) return;
+
+      const newIng = {
+          id: tempIngId,
+          name: stockItem.name,
+          qty: parseFloat(tempIngQty),
+          unit: stockItem.unit
+      };
+
+      setEditingProduct(prev => ({
+          ...prev,
+          ingredients: [...(prev.ingredients || []), newIng]
+      }));
+      setTempIngId('');
+      setTempIngQty('');
+  };
+
+  const handleRemoveIngredient = (index) => {
+      setEditingProduct(prev => ({
+          ...prev,
+          ingredients: prev.ingredients.filter((_, i) => i !== index)
+      }));
+  };
+
+  const getProductStockStatus = (product) => {
+    if (!product.ingredients || product.ingredients.length === 0) return { status: 'ok', label: 'Disponível' };
+    
+    let isLow = false;
+    let isOut = false;
+
+    for (const ing of product.ingredients) {
+        const stockItem = inventory.find(i => i.id === ing.id);
+        if (!stockItem || stockItem.quantity < ing.qty) {
+            isOut = true;
+            break; // Se faltar um, o prato está indisponível
+        }
+        // Considera "baixo" se tiver estoque para menos de 5 porções
+        if (stockItem.quantity < (ing.qty * 5)) {
+            isLow = true;
+        }
+    }
+
+    if (isOut) return { status: 'critical', label: 'Sem Estoque' };
+    if (isLow) return { status: 'warning', label: 'Estoque Baixo' };
+    return { status: 'ok', label: 'Disponível' };
   };
 
   // --- FUNÇÕES DE ESTOQUE ---
@@ -1051,19 +1107,27 @@ const AdminApp = () => {
 
         {activeTab === 'menu' && (
           <div className="space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center"><h1 className="text-2xl font-bold text-stone-800 font-serif">Gerenciar Cardápio</h1><button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: ''}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-md font-bold text-sm shadow-md hover:bg-stone-800 transition-colors">ADICIONAR ITEM</button></div>
+            <div className="flex justify-between items-center"><h1 className="text-2xl font-bold text-stone-800 font-serif">Gerenciar Cardápio</h1><button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: '', ingredients: []}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-md font-bold text-sm shadow-md hover:bg-stone-800 transition-colors">ADICIONAR ITEM</button></div>
             <div className="bg-white rounded-lg shadow-sm border border-stone-200 overflow-hidden overflow-x-auto">
               <table className="w-full text-left">
-                <thead className="bg-stone-50 text-stone-500 font-bold text-xs uppercase tracking-wider"><tr><th className="p-4">Produto</th><th className="p-4">Categoria</th><th className="p-4">Preço</th><th className="p-4 text-right">Ações</th></tr></thead>
+                <thead className="bg-stone-50 text-stone-500 font-bold text-xs uppercase tracking-wider"><tr><th className="p-4">Produto</th><th className="p-4">Categoria</th><th className="p-4">Preço</th><th className="p-4">Estoque</th><th className="p-4 text-right">Ações</th></tr></thead>
                 <tbody className="divide-y divide-stone-100">
-                  {products.map(p => (
-                    <tr key={p.id} className="hover:bg-stone-50 transition-colors">
-                      <td className="p-4 flex items-center gap-3"><img src={p.image} className="w-10 h-10 rounded object-cover bg-stone-200"/> <span className="font-medium text-stone-800">{p.name}</span></td>
-                      <td className="p-4 text-sm text-stone-500">{p.category}</td>
-                      <td className="p-4 font-bold text-stone-800">{formatCurrency(p.price)}</td>
-                      <td className="p-4 text-right"><button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="text-blue-600 hover:text-blue-800 font-bold text-xs mr-4">EDITAR</button><button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 font-bold text-xs">EXCLUIR</button></td>
-                    </tr>
-                  ))}
+                  {products.map(p => {
+                    const stockStatus = getProductStockStatus(p);
+                    return (
+                      <tr key={p.id} className="hover:bg-stone-50 transition-colors">
+                        <td className="p-4 flex items-center gap-3"><img src={p.image} className="w-10 h-10 rounded object-cover bg-stone-200"/> <span className="font-medium text-stone-800">{p.name}</span></td>
+                        <td className="p-4 text-sm text-stone-500">{p.category}</td>
+                        <td className="p-4 font-bold text-stone-800">{formatCurrency(p.price)}</td>
+                        <td className="p-4">
+                            {stockStatus.status === 'ok' && <span className="flex items-center gap-1 text-green-700 text-xs font-bold bg-green-100 px-2 py-1 rounded-full w-max"><CheckCircle size={12}/> OK</span>}
+                            {stockStatus.status === 'warning' && <span className="flex items-center gap-1 text-yellow-700 text-xs font-bold bg-yellow-100 px-2 py-1 rounded-full w-max"><AlertCircle size={12}/> BAIXO</span>}
+                            {stockStatus.status === 'critical' && <span className="flex items-center gap-1 text-red-700 text-xs font-bold bg-red-100 px-2 py-1 rounded-full w-max"><AlertTriangle size={12}/> ZERADO</span>}
+                        </td>
+                        <td className="p-4 text-right"><button onClick={() => { setEditingProduct(p); setIsProductFormOpen(true); }} className="text-blue-600 hover:text-blue-800 font-bold text-xs mr-4">EDITAR</button><button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 font-bold text-xs">EXCLUIR</button></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1231,6 +1295,35 @@ const AdminApp = () => {
                   <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Categoria</label><select className="w-full p-2 border border-stone-300 rounded bg-white" value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}><option>Assados</option><option>Acompanhamentos</option><option>Sobremesas</option><option>Bebidas</option></select></div>
                 </div>
                 <div><label className="block text-xs font-bold text-stone-500 uppercase mb-1">Descrição</label><textarea className="w-full p-2 border border-stone-300 rounded h-20" value={editingProduct.description} onChange={e => setEditingProduct({...editingProduct, description: e.target.value})} /></div>
+                
+                {/* FICHA TÉCNICA / INGREDIENTES */}
+                <div className="bg-stone-50 p-3 rounded-lg border border-stone-200">
+                    <label className="block text-xs font-bold text-stone-500 uppercase mb-2 flex items-center gap-1"><Box size={14}/> Ficha Técnica / Ingredientes</label>
+                    <div className="flex gap-2 mb-2">
+                        <select className="flex-1 p-2 border border-stone-300 rounded text-sm bg-white" value={tempIngId} onChange={e => setTempIngId(e.target.value)}>
+                            <option value="">Selecione um ingrediente...</option>
+                            {inventory.map(item => (
+                                <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+                            ))}
+                        </select>
+                        <input type="number" placeholder="Qtd" className="w-20 p-2 border border-stone-300 rounded text-sm" value={tempIngQty} onChange={e => setTempIngQty(e.target.value)} />
+                        <button onClick={handleAddIngredient} className="bg-stone-800 text-white p-2 rounded hover:bg-stone-700"><Plus size={16}/></button>
+                    </div>
+                    
+                    {editingProduct.ingredients && editingProduct.ingredients.length > 0 ? (
+                        <div className="space-y-1">
+                            {editingProduct.ingredients.map((ing, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-stone-100">
+                                    <span>{ing.qty} {ing.unit} de <b>{ing.name}</b></span>
+                                    <button onClick={() => handleRemoveIngredient(idx)} className="text-red-500 hover:text-red-700"><X size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-stone-400 italic">Nenhum ingrediente vinculado.</p>
+                    )}
+                </div>
+
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t mt-4"><button onClick={() => setIsProductFormOpen(false)} className="px-4 py-2 text-stone-500 hover:text-stone-800 font-bold text-sm">CANCELAR</button><button onClick={handleSaveProduct} className="px-6 py-2 bg-stone-900 text-white font-bold rounded-md text-sm hover:bg-stone-800 flex items-center gap-2"><Save size={16}/> SALVAR</button></div>
           </div>
