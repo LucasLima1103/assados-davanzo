@@ -100,6 +100,7 @@ const getStatusColor = (status) => {
     case 'pronto': return 'bg-green-50 text-green-700 border-green-200';
     case 'em_entrega': return 'bg-purple-50 text-purple-700 border-purple-200';
     case 'entregue': return 'bg-gray-100 text-gray-500 border-gray-200 line-through';
+    case 'cancelado': return 'bg-red-50 text-red-700 border-red-200 line-through';
     default: return 'bg-gray-50 text-gray-700';
   }
 };
@@ -746,25 +747,88 @@ const AdminApp = () => {
         )}
 
         {activeTab === 'orders' && (
-          <div className="space-y-6 animate-in fade-in">
-            <h1 className="text-2xl font-bold text-stone-800 font-serif">Pedidos (KDS)</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {orders.filter(o => o.status !== 'entregue').map(order => (
-                <div key={order.id} className="bg-white rounded-lg shadow-sm border border-stone-200 flex flex-col overflow-hidden">
-                  <div className={`p-4 border-b flex justify-between items-center ${order.status === 'pendente' ? 'bg-yellow-50' : 'bg-white'}`}><span className="font-mono font-bold text-stone-600">#{order.id.slice(0,4).toUpperCase()}</span><Badge color={getStatusColor(order.status)}>{order.status}</Badge></div>
-                  <div className="p-4 flex-1">
-                    <h3 className="font-bold text-lg">{order.customer}</h3>
-                    {order.paymentMethod && <div className="text-xs text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-1 mb-2">Pgto: {order.paymentMethod}</div>}
-                    <div className="space-y-2 mt-2">{order.items?.map((item, i) => (<div key={i} className="flex justify-between text-sm border-b border-stone-100 pb-1 last:border-0"><span><b className="mr-1">{item.qty}x</b> {item.name}</span></div>))}</div>
-                    {order.notes && <div className="mt-3 text-xs bg-red-50 text-red-700 p-2 rounded border border-red-100 italic">" {order.notes} "</div>}
+          <div className="space-y-8 animate-in fade-in">
+            {/* Header */}
+            <div>
+               <h1 className="text-2xl font-bold text-stone-800 font-serif">Gerenciamento de Pedidos</h1>
+               <p className="text-stone-500 text-sm">Controle de produção e histórico</p>
+            </div>
+
+            {/* SEÇÃO 1: KDS (COZINHA) - PEDIDOS ATIVOS */}
+            <div>
+               <h2 className="text-lg font-bold text-stone-700 mb-4 flex items-center gap-2"><ChefHat size={20} className="text-orange-600"/> Fila de Produção (KDS)</h2>
+               
+               {orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado').length === 0 ? (
+                  <div className="bg-white rounded-lg p-10 text-center border-2 border-dashed border-stone-200">
+                      <div className="bg-stone-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-stone-300">
+                          <CheckCircle size={32} />
+                      </div>
+                      <h3 className="text-stone-800 font-bold text-lg">Tudo limpo por aqui!</h3>
+                      <p className="text-stone-500 text-sm">Nenhum pedido pendente na cozinha no momento.</p>
                   </div>
-                  <div className="p-4 bg-stone-50 border-t border-stone-100 grid grid-cols-2 gap-2">
-                    {order.status === 'pendente' && <button onClick={() => updateOrderStatus(order.id, 'preparando')} className="col-span-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold shadow-sm transition-colors">INICIAR PREPARO</button>}
-                    {order.status === 'preparando' && <button onClick={() => updateOrderStatus(order.id, 'pronto')} className="col-span-2 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold shadow-sm transition-colors">MARCAR PRONTO</button>}
-                    {order.status === 'pronto' && <div className="col-span-2 text-center text-xs font-bold text-green-700 py-2 uppercase tracking-wide">Aguardando Entregador</div>}
+               ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {orders.filter(o => o.status !== 'entregue' && o.status !== 'cancelado').map(order => (
+                        <div key={order.id} className="bg-white rounded-lg shadow-sm border border-stone-200 flex flex-col overflow-hidden">
+                        <div className={`p-4 border-b flex justify-between items-center ${order.status === 'pendente' ? 'bg-yellow-50' : 'bg-white'}`}><span className="font-mono font-bold text-stone-600">#{order.id.slice(0,4).toUpperCase()}</span><Badge color={getStatusColor(order.status)}>{order.status}</Badge></div>
+                        <div className="p-4 flex-1">
+                            <h3 className="font-bold text-lg">{order.customer}</h3>
+                            {order.paymentMethod && <div className="text-xs text-stone-500 bg-stone-100 inline-block px-2 py-1 rounded mt-1 mb-2">Pgto: {order.paymentMethod}</div>}
+                            <div className="space-y-2 mt-2">{order.items?.map((item, i) => (<div key={i} className="flex justify-between text-sm border-b border-stone-100 pb-1 last:border-0"><span><b className="mr-1">{item.qty}x</b> {item.name}</span></div>))}</div>
+                            {order.notes && <div className="mt-3 text-xs bg-red-50 text-red-700 p-2 rounded border border-red-100 italic">" {order.notes} "</div>}
+                        </div>
+                        <div className="p-4 bg-stone-50 border-t border-stone-100 grid grid-cols-2 gap-2">
+                            {order.status === 'pendente' && <button onClick={() => updateOrderStatus(order.id, 'preparando')} className="col-span-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold shadow-sm transition-colors">INICIAR PREPARO</button>}
+                            {order.status === 'preparando' && <button onClick={() => updateOrderStatus(order.id, 'pronto')} className="col-span-2 py-2 bg-green-600 hover:bg-green-700 text-white rounded font-bold shadow-sm transition-colors">MARCAR PRONTO</button>}
+                            {order.status === 'pronto' && <div className="col-span-2 text-center text-xs font-bold text-green-700 py-2 uppercase tracking-wide">Aguardando Entregador</div>}
+                        </div>
+                        </div>
+                    ))}
                   </div>
+               )}
+            </div>
+
+            {/* SEÇÃO 2: HISTÓRICO RECENTE */}
+            <div className="pt-4 border-t border-stone-200">
+                <h2 className="text-lg font-bold text-stone-700 mb-4 flex items-center gap-2"><Clock size={20} className="text-stone-400"/> Histórico Recente</h2>
+                <div className="bg-white rounded-lg shadow-sm border border-stone-200 overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-stone-50 text-stone-500 font-bold uppercase tracking-wider">
+                            <tr>
+                                <th className="p-4">Pedido</th>
+                                <th className="p-4">Cliente</th>
+                                <th className="p-4 hidden md:table-cell">Itens</th>
+                                <th className="p-4">Total</th>
+                                <th className="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-stone-100">
+                            {orders.filter(o => o.status === 'entregue' || o.status === 'cancelado').slice(0, 10).map(order => (
+                                <tr key={order.id} className="hover:bg-stone-50">
+                                    <td className="p-4 font-mono text-stone-500">#{order.id.slice(0,4).toUpperCase()}</td>
+                                    <td className="p-4 font-bold text-stone-700">
+                                        {order.customer}
+                                        <div className="text-xs text-stone-400 font-normal">{new Date(order.createdAt).toLocaleDateString('pt-BR')}</div>
+                                    </td>
+                                    <td className="p-4 text-stone-600 hidden md:table-cell max-w-xs truncate">
+                                        {order.items?.map(i => `${i.qty}x ${i.name}`).join(', ')}
+                                    </td>
+                                    <td className="p-4 font-bold text-stone-800">{formatCurrency(order.total)}</td>
+                                    <td className="p-4">
+                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${order.status === 'entregue' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {order.status.toUpperCase()}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            {orders.filter(o => o.status === 'entregue' || o.status === 'cancelado').length === 0 && (
+                                <tr>
+                                    <td colSpan="5" className="p-8 text-center text-stone-400 italic">Nenhum histórico disponível.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-              ))}
             </div>
           </div>
         )}
