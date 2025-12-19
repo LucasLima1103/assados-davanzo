@@ -1025,6 +1025,123 @@ const AdminApp = () => {
 };
 
 // ==========================================
+// 3. MÓDULO DO ENTREGADOR (DRIVER APP)
+// ==========================================
+
+const DriverApp = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [orders, setOrders] = useState([]);
+
+  // Auth Listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      // Entregador também precisa ser usuário real (e-mail/senha)
+      if (currentUser && !currentUser.isAnonymous) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Orders
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const unsubOrders = onSnapshot(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), (snap) => {
+      const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setOrders(items);
+    });
+    return () => unsubOrders();
+  }, [isAuthenticated]);
+
+  const updateOrderStatus = async (id, status, extraData = {}) => {
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status, ...extraData });
+  };
+
+  if (!isAuthenticated) return <LoginScreen title="Área do Entregador" onLogin={() => setIsAuthenticated(true)} />;
+
+  return (
+    <div className="min-h-screen bg-stone-100 font-sans pb-20">
+      <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 flex justify-between items-center shadow-lg">
+        <h2 className="font-bold text-lg flex gap-2 items-center"><Bike className="text-green-500" /> Entregas</h2>
+        <div className="flex items-center gap-3">
+           <span className="text-xs text-stone-400 hidden sm:inline">{user?.email}</span>
+           <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20} /></button>
+        </div>
+      </header>
+
+      <main className="p-4 space-y-6">
+        
+        {/* DISPONÍVEIS PARA PEGAR */}
+        <div>
+          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-green-500">Prontos na Cozinha</h3>
+          <div className="space-y-3">
+            {orders.filter(o => o.status === 'pronto').map(order => (
+              <div key={order.id} className="bg-white p-4 rounded-md shadow-sm border border-stone-200 animate-in slide-in-from-left duration-300">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold text-xl">{order.customer}</span>
+                  <span className="bg-stone-100 text-stone-500 text-xs px-2 py-1 rounded font-mono">#{order.id.slice(0,4)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4 bg-stone-50 p-2 rounded">
+                  <MapPin size={16} className="shrink-0"/> {order.address}
+                </div>
+                {/* Ao clicar, salva o email do entregador no pedido */}
+                <button onClick={() => updateOrderStatus(order.id, 'em_entrega', { driverEmail: user.email })} className="w-full py-3 bg-stone-900 text-white font-bold rounded shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                  <Bike size={20}/> INICIAR ROTA
+                </button>
+              </div>
+            ))}
+            {orders.filter(o => o.status === 'pronto').length === 0 && (
+              <p className="text-center text-stone-400 text-sm py-4 italic">Nenhum pedido aguardando.</p>
+            )}
+          </div>
+        </div>
+
+        {/* EM ANDAMENTO */}
+        <div>
+          <h3 className="font-bold text-stone-500 uppercase text-xs mb-3 pl-1 border-l-4 border-purple-500">Minhas Entregas em Curso</h3>
+          <div className="space-y-3">
+            {/* Filtra apenas os pedidos que estão em entrega E que foram pegos por ESTE usuário */}
+            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).map(order => (
+              <div key={order.id} className="bg-white p-4 rounded-md shadow-md border-l-4 border-purple-600 animate-in zoom-in duration-300">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="font-bold text-xl">{order.customer}</span>
+                  <Badge color="bg-purple-100 text-purple-700 border-purple-200">EM ROTA</Badge>
+                </div>
+                <div className="flex items-center gap-2 text-stone-600 text-sm mb-4">
+                  <MapPin size={16} className="shrink-0"/> {order.address}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <a 
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="py-3 bg-stone-100 text-stone-700 font-bold rounded text-xs hover:bg-stone-200 flex items-center justify-center gap-2"
+                  >
+                    <MapPin size={16}/> MAPA
+                  </a>
+                  <button onClick={() => updateOrderStatus(order.id, 'entregue')} className="py-3 bg-green-600 text-white font-bold rounded text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform">
+                    <CheckCircle size={16}/> ENTREGUE
+                  </button>
+                </div>
+              </div>
+            ))}
+            {orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email).length === 0 && (
+              <p className="text-center text-stone-400 text-sm py-4 italic">Você não tem entregas ativas.</p>
+            )}
+          </div>
+        </div>
+
+      </main>
+    </div>
+  );
+};
+
+// ==========================================
 // 4. COMPONENTE PRINCIPAL COM ROTEAMENTO
 // ==========================================
 
