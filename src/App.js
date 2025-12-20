@@ -1017,16 +1017,18 @@ const AdminApp = () => {
                                                 <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.quantity < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                                                     {item.quantity} {item.unit}
                                                 </span>
-                                                {/* TOOLTIP DE HISTÓRICO */}
+                                                {/* TOOLTIP DE HISTÓRICO ATUALIZADO */}
                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-stone-800 text-white text-xs rounded p-2 z-20 shadow-xl pointer-events-none animate-in fade-in zoom-in-95 duration-200">
-                                                   <div className="font-bold border-b border-stone-600 pb-1 mb-1 flex items-center gap-2"><History size={12}/> Últimas Entradas</div>
+                                                   <div className="font-bold border-b border-stone-600 pb-1 mb-1 flex items-center gap-2"><History size={12}/> Histórico de Movimentações</div>
                                                    {item.history && item.history.length > 0 ? (
                                                       <div className="space-y-1">
                                                         {item.history.slice(-5).reverse().map((h, i) => (
                                                             <div key={i} className="flex justify-between py-1 border-b border-stone-700 last:border-0 last:pb-0">
                                                                 <span className="text-stone-400">{new Date(h.date).toLocaleDateString()}</span>
-                                                                <span className="text-green-400 font-bold">+{h.qty}</span>
-                                                                <span className="text-stone-300">{formatCurrency(h.cost)}</span>
+                                                                <span className={`font-bold ${h.qty < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                                                    {h.qty > 0 ? '+' : ''}{h.qty}
+                                                                </span>
+                                                                <span className="text-stone-300">{h.qty > 0 ? formatCurrency(h.cost) : '---'}</span>
                                                             </div>
                                                         ))}
                                                       </div>
@@ -1346,121 +1348,6 @@ const AdminApp = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-// ==========================================
-// 3. MÓDULO DO ENTREGADOR (DRIVER APP)
-// ==========================================
-
-const DriverApp = () => {
-  const [user, setUser] = useState(null);
-  const [orders, setOrders] = useState([]);
-
-  // Monitorar Auth
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      // Mesma lógica do Admin: só permite usuários não-anônimos
-      if (currentUser && !currentUser.isAnonymous) setUser(currentUser);
-      else setUser(null);
-    });
-    return () => unsub();
-  }, []);
-
-  // Monitorar Pedidos Relevantes (Pronto ou Em Entrega)
-  useEffect(() => {
-    if (!user) return;
-    const q = collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders');
-    const unsub = onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const relevant = items.filter(o => ['pronto', 'em_entrega'].includes(o.status));
-      setOrders(relevant.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
-    });
-    return () => unsub();
-  }, [user]);
-
-  const acceptOrder = async (orderId) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId), {
-      status: 'em_entrega',
-      driverId: user.uid,
-      driverEmail: user.email
-    });
-  };
-
-  const finishOrder = async (orderId) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId), {
-      status: 'entregue'
-    });
-  };
-
-  // --- SEGURANÇA: Se não autenticado, mostra Login ---
-  if (!user) {
-      return <LoginScreen title="App do Entregador" onLogin={() => {}} />;
-  }
-
-  const myDeliveries = orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email);
-  const availableOrders = orders.filter(o => o.status === 'pronto');
-
-  return (
-    <div className="min-h-screen bg-stone-100 pb-20 font-sans">
-       <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center">
-          <div className="flex items-center gap-2"><Bike className="text-orange-500"/><span className="font-bold">Painel do Entregador</span></div>
-          <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20}/></button>
-       </header>
-       
-       <main className="p-4 space-y-6">
-          {/* MINHAS ENTREGAS ATUAIS */}
-          <div>
-             <h3 className="font-bold text-stone-600 uppercase text-xs mb-3 flex items-center gap-2 border-b border-stone-200 pb-2"><Bike size={16}/> Minhas Entregas em Curso</h3>
-             <div className="space-y-3">
-                {myDeliveries.length === 0 ? <div className="p-6 bg-white rounded border border-dashed text-center text-stone-400 text-sm">Você não tem entregas ativas.</div> : 
-                   myDeliveries.map(order => (
-                      <div key={order.id} className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500 animate-in slide-in-from-left">
-                         <div className="flex justify-between mb-2">
-                            <span className="font-bold text-lg font-serif">#{order.id.slice(0,4).toUpperCase()}</span>
-                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded font-bold uppercase tracking-wide">EM ROTA</span>
-                         </div>
-                         <div className="mb-4 space-y-1">
-                            <p className="font-bold text-stone-800">{order.customer}</p>
-                            <p className="text-sm text-stone-500 flex items-start gap-1"><MapPin size={14} className="mt-0.5 shrink-0"/> {order.address}</p>
-                            {order.whatsapp && <a href={`https://wa.me/55${order.whatsapp.replace(/\D/g,'')}?text=Olá, sou o entregador e estou a caminho!`} target="_blank" className="text-xs text-green-600 font-bold mt-2 inline-flex items-center gap-1 hover:underline"><Users size={12}/> Chamar no WhatsApp</a>}
-                         </div>
-                         <div className="grid grid-cols-2 gap-3">
-                            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`} target="_blank" className="py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-sm rounded flex items-center justify-center gap-2 transition-colors"><MapPin size={16}/> MAPA</a>
-                            <button onClick={() => finishOrder(order.id)} className="py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded flex items-center justify-center gap-2 transition-colors shadow-sm"><CheckCircle size={16}/> ENTREGUE</button>
-                         </div>
-                      </div>
-                   ))
-                }
-             </div>
-          </div>
-
-          {/* PEDIDOS DISPONÍVEIS */}
-          <div>
-             <h3 className="font-bold text-stone-600 uppercase text-xs mb-3 flex items-center gap-2 border-b border-stone-200 pb-2"><Package size={16}/> Disponíveis para Retirada</h3>
-             <div className="space-y-3">
-                {availableOrders.length === 0 ? <div className="p-10 text-center text-stone-400 italic">Nenhum pedido aguardando retirada no restaurante.</div> : 
-                   availableOrders.map(order => (
-                      <div key={order.id} className="bg-white p-4 rounded-lg shadow-sm border border-stone-200">
-                         <div className="flex justify-between mb-2">
-                            <span className="font-bold font-serif">#{order.id.slice(0,4).toUpperCase()}</span>
-                            <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold uppercase tracking-wide">AGUARDANDO</span>
-                         </div>
-                         <div className="mb-4 border-b border-stone-100 pb-3">
-                            <p className="font-bold text-stone-800">{order.customer}</p>
-                            <p className="text-sm text-stone-500 truncate">{order.address}</p>
-                            <p className="text-xs text-stone-400 mt-2 flex items-center gap-2"><Box size={12}/> {order.items.length} volumes • {formatCurrency(order.total)}</p>
-                         </div>
-                         <button onClick={() => acceptOrder(order.id)} className="w-full py-3 bg-stone-800 text-white font-bold text-sm rounded hover:bg-stone-900 transition-colors flex items-center justify-center gap-2 shadow-lg"><Bike size={18}/> PEGAR ENTREGA</button>
-                      </div>
-                   ))
-                }
-             </div>
-          </div>
-       </main>
     </div>
   );
 };
