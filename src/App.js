@@ -1285,6 +1285,10 @@ const AdminApp = () => {
                                     <span className="font-bold text-stone-700 truncate w-24">{order.customer}</span>
                                     <span className="text-stone-400">{order.id.slice(0,4)}</span>
                                 </div>
+                                <div className="flex justify-between items-center mb-1 text-stone-600">
+                                    <span className="font-bold">{formatCurrency(order.total)}</span>
+                                    <span className="text-[10px] bg-stone-100 px-1.5 py-0.5 rounded border border-stone-200">{order.paymentMethod}</span>
+                                </div>
                                 {order.driverEmail && <p className="text-stone-500 truncate mb-1">Ent: {order.driverEmail.split('@')[0]}</p>}
                                 <span className="text-green-600 font-bold flex items-center gap-1"><Check size={10}/> Entregue</span>
                             </div>
