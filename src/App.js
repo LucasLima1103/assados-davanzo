@@ -3,7 +3,7 @@ import {
   ShoppingBag, ChefHat, Plus, Minus, Trash2, X, ArrowRight, 
   MapPin, Send, Copy, Lock, LayoutDashboard, Package, Menu, 
   Bike, Save, Edit, Image as ImageIcon, Upload, Loader, CheckCircle, Store, LogOut, UserPlus, Users, Clock, Check,
-  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search, History, AlertTriangle, AlertCircle
+  Calendar, TrendingUp, BarChart3, CreditCard, PieChart, DollarSign, Box, Search, History, AlertTriangle, AlertCircle, RefreshCw
 } from 'lucide-react';
 
 // --- IMPORTAÇÕES DO FIREBASE ---
@@ -680,6 +680,56 @@ const AdminApp = () => {
     return { status: 'ok', label: 'Disponível' };
   };
 
+  // --- FUNÇÃO DE RESTAURAÇÃO DE EMERGÊNCIA ---
+  const handleRestoreDefaults = async () => {
+    if(!confirm("Atenção: Isso irá recriar os produtos padrão no cardápio. Continuar?")) return;
+    
+    const defaultProducts = [
+        {
+            name: "Frango Assado",
+            price: 45.00,
+            category: "Assados",
+            description: "Frango inteiro assado na brasa, suculento e temperado com ervas finas.",
+            image: "https://images.unsplash.com/photo-1598103442097-8b74072756b1?auto=format&fit=crop&w=400&q=80",
+            ingredients: []
+        },
+        {
+            name: "Costela Bovina",
+            price: 85.00,
+            category: "Assados",
+            description: "Costela bovina assada lentamente por 12 horas, desmanchando.",
+            image: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=400&q=80",
+            ingredients: []
+        },
+        {
+            name: "Maionese da Casa",
+            price: 15.00,
+            category: "Acompanhamentos",
+            description: "Tradicional salada de maionese com batatas e cenoura.",
+            image: "https://images.unsplash.com/photo-1576021182211-9ea8dced3690?auto=format&fit=crop&w=400&q=80",
+            ingredients: []
+        },
+        {
+            name: "Farofa Especial",
+            price: 10.00,
+            category: "Acompanhamentos",
+            description: "Farofa crocante com bacon e calabresa.",
+            image: "https://images.unsplash.com/photo-1626804475297-411eb890afec?auto=format&fit=crop&w=400&q=80",
+            ingredients: []
+        }
+    ];
+
+    try {
+        for (const prod of defaultProducts) {
+            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'products'), prod);
+        }
+        alert("Produtos restaurados com sucesso!");
+    } catch (error) {
+        console.error(error);
+        alert("Erro ao restaurar: " + error.message);
+    }
+  };
+
   // --- FUNÇÕES DE ESTOQUE ---
   const handleSaveInventory = async () => {
     if (!inventoryItem.name || !inventoryItem.quantity) return alert("Preencha nome e quantidade.");
@@ -1126,7 +1176,13 @@ const AdminApp = () => {
 
         {activeTab === 'menu' && (
           <div className="space-y-6 animate-in fade-in">
-            <div className="flex justify-between items-center"><h1 className="text-2xl font-bold text-stone-800 font-serif">Gerenciar Cardápio</h1><button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: '', ingredients: []}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-md font-bold text-sm shadow-md hover:bg-stone-800 transition-colors">ADICIONAR ITEM</button></div>
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-stone-800 font-serif">Gerenciar Cardápio</h1>
+                <div className="flex gap-2">
+                    <button onClick={handleRestoreDefaults} className="px-4 py-2 bg-stone-200 text-stone-600 hover:text-stone-800 rounded-md font-bold text-sm shadow-sm hover:bg-stone-300 transition-colors flex items-center gap-2" title="Restaura os produtos padrão se tiverem sido excluídos"><RefreshCw size={16}/> Restaurar Padrões</button>
+                    <button onClick={() => { setEditingProduct({name:'', price:'', category:'Assados', image: '', ingredients: []}); setIsProductFormOpen(true); }} className="px-4 py-2 bg-stone-900 text-white rounded-md font-bold text-sm shadow-md hover:bg-stone-800 transition-colors">ADICIONAR ITEM</button>
+                </div>
+            </div>
             <div className="bg-white rounded-lg shadow-sm border border-stone-200 overflow-hidden overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="bg-stone-50 text-stone-500 font-bold text-xs uppercase tracking-wider"><tr><th className="p-4">Produto</th><th className="p-4">Categoria</th><th className="p-4">Preço</th><th className="p-4">Estoque</th><th className="p-4 text-right">Ações</th></tr></thead>
@@ -1352,6 +1408,121 @@ const AdminApp = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ==========================================
+// 3. MÓDULO DO ENTREGADOR (DRIVER APP)
+// ==========================================
+
+const DriverApp = () => {
+  const [user, setUser] = useState(null);
+  const [orders, setOrders] = useState([]);
+
+  // Monitorar Auth
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (currentUser) => {
+      // Mesma lógica do Admin: só permite usuários não-anônimos
+      if (currentUser && !currentUser.isAnonymous) setUser(currentUser);
+      else setUser(null);
+    });
+    return () => unsub();
+  }, []);
+
+  // Monitorar Pedidos Relevantes (Pronto ou Em Entrega)
+  useEffect(() => {
+    if (!user) return;
+    const q = collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders');
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const relevant = items.filter(o => ['pronto', 'em_entrega'].includes(o.status));
+      setOrders(relevant.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
+    });
+    return () => unsub();
+  }, [user]);
+
+  const acceptOrder = async (orderId) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId), {
+      status: 'em_entrega',
+      driverId: user.uid,
+      driverEmail: user.email
+    });
+  };
+
+  const finishOrder = async (orderId) => {
+    if (!user) return;
+    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', orderId), {
+      status: 'entregue'
+    });
+  };
+
+  // --- SEGURANÇA: Se não autenticado, mostra Login ---
+  if (!user) {
+      return <LoginScreen title="App do Entregador" onLogin={() => {}} />;
+  }
+
+  const myDeliveries = orders.filter(o => o.status === 'em_entrega' && o.driverEmail === user.email);
+  const availableOrders = orders.filter(o => o.status === 'pronto');
+
+  return (
+    <div className="min-h-screen bg-stone-100 pb-20 font-sans">
+       <header className="bg-stone-900 text-white p-4 sticky top-0 z-10 shadow-md flex justify-between items-center">
+          <div className="flex items-center gap-2"><Bike className="text-orange-500"/><span className="font-bold">Painel do Entregador</span></div>
+          <button onClick={() => signOut(auth)} className="text-stone-400 hover:text-white"><LogOut size={20}/></button>
+       </header>
+       
+       <main className="p-4 space-y-6">
+          {/* MINHAS ENTREGAS ATUAIS */}
+          <div>
+             <h3 className="font-bold text-stone-600 uppercase text-xs mb-3 flex items-center gap-2 border-b border-stone-200 pb-2"><Bike size={16}/> Minhas Entregas em Curso</h3>
+             <div className="space-y-3">
+                {myDeliveries.length === 0 ? <div className="p-6 bg-white rounded border border-dashed text-center text-stone-400 text-sm">Você não tem entregas ativas.</div> : 
+                   myDeliveries.map(order => (
+                      <div key={order.id} className="bg-white p-4 rounded-lg shadow-md border-l-4 border-green-500 animate-in slide-in-from-left">
+                         <div className="flex justify-between mb-2">
+                            <span className="font-bold text-lg font-serif">#{order.id.slice(0,4).toUpperCase()}</span>
+                            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded font-bold uppercase tracking-wide">EM ROTA</span>
+                         </div>
+                         <div className="mb-4 space-y-1">
+                            <p className="font-bold text-stone-800">{order.customer}</p>
+                            <p className="text-sm text-stone-500 flex items-start gap-1"><MapPin size={14} className="mt-0.5 shrink-0"/> {order.address}</p>
+                            {order.whatsapp && <a href={`https://wa.me/55${order.whatsapp.replace(/\D/g,'')}?text=Olá, sou o entregador e estou a caminho!`} target="_blank" className="text-xs text-green-600 font-bold mt-2 inline-flex items-center gap-1 hover:underline"><Users size={12}/> Chamar no WhatsApp</a>}
+                         </div>
+                         <div className="grid grid-cols-2 gap-3">
+                            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`} target="_blank" className="py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-sm rounded flex items-center justify-center gap-2 transition-colors"><MapPin size={16}/> MAPA</a>
+                            <button onClick={() => finishOrder(order.id)} className="py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded flex items-center justify-center gap-2 transition-colors shadow-sm"><CheckCircle size={16}/> ENTREGUE</button>
+                         </div>
+                      </div>
+                   ))
+                }
+             </div>
+          </div>
+
+          {/* PEDIDOS DISPONÍVEIS */}
+          <div>
+             <h3 className="font-bold text-stone-600 uppercase text-xs mb-3 flex items-center gap-2 border-b border-stone-200 pb-2"><Package size={16}/> Disponíveis para Retirada</h3>
+             <div className="space-y-3">
+                {availableOrders.length === 0 ? <div className="p-10 text-center text-stone-400 italic">Nenhum pedido aguardando retirada no restaurante.</div> : 
+                   availableOrders.map(order => (
+                      <div key={order.id} className="bg-white p-4 rounded-lg shadow-sm border border-stone-200">
+                         <div className="flex justify-between mb-2">
+                            <span className="font-bold font-serif">#{order.id.slice(0,4).toUpperCase()}</span>
+                            <span className="text-[10px] bg-yellow-100 text-yellow-800 px-2 py-1 rounded font-bold uppercase tracking-wide">AGUARDANDO</span>
+                         </div>
+                         <div className="mb-4 border-b border-stone-100 pb-3">
+                            <p className="font-bold text-stone-800">{order.customer}</p>
+                            <p className="text-sm text-stone-500 truncate">{order.address}</p>
+                            <p className="text-xs text-stone-400 mt-2 flex items-center gap-2"><Box size={12}/> {order.items.length} volumes • {formatCurrency(order.total)}</p>
+                         </div>
+                         <button onClick={() => acceptOrder(order.id)} className="w-full py-3 bg-stone-800 text-white font-bold text-sm rounded hover:bg-stone-900 transition-colors flex items-center justify-center gap-2 shadow-lg"><Bike size={18}/> PEGAR ENTREGA</button>
+                      </div>
+                   ))
+                }
+             </div>
+          </div>
+       </main>
     </div>
   );
 };
